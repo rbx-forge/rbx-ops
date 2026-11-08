@@ -15,7 +15,7 @@ rbx-ops group rank builderman Moderator --apply   # give a member a role
 
 `--group <id>` names it, and works with no file on disk at all.
 
-Without the flag, the group comes from `rbxplace.toml`: its `[owner]`, or an env's own `[envs.<name>.owner]` when `--env` names one. An owner that is a **user** is refused rather than read as a group id, since the two are different numbers that happen to look alike.
+Without the flag, the group comes from `rbxplace.toml`: its `[owner]`, or an env's own `[<env>.owner]` when `--env` names one. An owner that is a **user** is refused rather than read as a group id, since the two are different numbers that happen to look alike.
 
 ## What Open Cloud allows
 
@@ -85,7 +85,7 @@ rbx-ops group member builderman
 rbx-ops group member name:12345 --json
 ```
 
-Every role the member holds, highest rank first, not only the highest one. A role the key cannot see in the listing is still shown, by id, rather than dropped. The member is found the way [`rank`](#rbx-group-rank-and-unrank) finds one, so the same key scopes apply.
+Every role the member holds, highest rank first, not only the highest one. A role the key cannot see in the listing is still shown, by id, rather than dropped. The member is found the way [`rank`](#rbx-ops-group-rank-and-unrank) finds one, so the same key scopes apply.
 
 ## rbx-ops group members
 

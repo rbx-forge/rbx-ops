@@ -8,8 +8,6 @@ The push half of the pair [`memorystore`](./memorystore.md) is the pull half of.
 
 See the [README](../README.md) for install, keys and the safety model.
 
-This page describes `main`. Check `rbx-ops --version` against what your `rokit.toml` pins.
-
 
 Needs `universe-messaging-service:publish`, which is universe-targeted and not on most existing keys: a 403 here usually means the scope, not the key.
 

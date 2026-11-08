@@ -85,7 +85,7 @@ pub struct GroupCli {
     /// The group id.
     ///
     /// Optional when `rbxplace.toml` names a group as its `[owner]`, which a
-    /// per-env `[envs.<name>.owner]` overrides. Required otherwise, so the
+    /// per-env `[<env>.owner]` overrides. Required otherwise, so the
     /// command works with no file on disk at all.
     #[arg(long, global = true)]
     group: Option<u64>,

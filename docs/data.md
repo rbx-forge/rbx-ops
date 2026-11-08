@@ -91,9 +91,7 @@ rbx-ops data --datastore PlayerData delete-key Player_156 --env prod          # 
 rbx-ops data --datastore PlayerData delete-key Player_156 --env prod --apply
 ```
 
-Spelled `delete-key` since 0.7.0, beside `delete-store` below. The level is in the name on both, so neither reads as the default: `delete Player_156` and `delete-store PlayerData` would be one glance apart in a shell history, and only one of them is recoverable by re-running the game.
-
-**The bare `delete` and `restore` were kept as aliases in 0.7.0 and removed in 0.9.0.** They were the exact spellings the rename existed to get rid of, held open for callers who did not exist yet. Use `delete-key` and `restore-key`.
+Spelled `delete-key`, beside `delete-store` below. The level is in the name on both, so neither reads as the default: `delete Player_156` and `delete-store PlayerData` would be one glance apart in a shell history, and only one of them is recoverable by re-running the game. There is no bare `delete` or `restore` for the same reason.
 
 Despite the name it is the **gentler** of the two ways to start a player over. A normal read then answers nothing, so a game that builds a fresh profile when it finds none builds one, from its own template rather than from a copy of that template you have to keep in step. And the value survives: the entry stays in a listing with `--show-deleted`, and its last value stays readable through `data revisions` for thirty days. `set` and `reset` destroy it the moment they land.
 
@@ -133,7 +131,7 @@ A store exists **from its first write**, not from the first `GetDataStore`, so a
 
 ## Removing a store
 
-The level above `delete-key`, and it exists to close an asymmetry. A store comes into being from the first write to a name nobody created, so this tool could make one by accident and could not remove one at all: until 0.7.0 the only way back was the Creator Hub.
+The level above `delete-key`, and it exists to close an asymmetry. A store comes into being from the first write to a name nobody created, so without this command a tool could make one by accident and only the Creator Hub could remove it.
 
 ```sh
 rbx-ops data delete-store Sessions --env prod          # dry run
@@ -255,9 +253,15 @@ Scopes: `universe.ordered-data-store.scope.entry:read` for `list` and `get`, `:w
 
 ## Machine-readable output
 
-`--json` on the four reads (`get`, `list`, `revisions` and `diff`) writes one JSON document to stdout and nothing else. Everything that is not the result (the revision line, the key count, "No entry", the unknown-key warning from `rbxplace.toml`) goes to stderr, so `jq` reads the pipe and a human still reads the terminal.
+`--json` writes one JSON document to stdout and nothing else. Everything that is not the result (the revision line, the key count, "No entry", the unknown-key warning from `rbxplace.toml`) goes to stderr, so `jq` reads the pipe and a human still reads the terminal.
 
-The four writes do not take it. `set`, `reset`, `restore`, `copy`, `increment` and `snapshot` all stop and ask before they act, and a format that owns stdout cannot stop and ask: the prompt would land in the document, or in a pipeline where nobody can answer it. So the flag is not there to be refused at runtime: it does not exist on those subcommands at all.
+| Takes `--json` | Subcommands |
+| --- | --- |
+| Always | `get`, `list`, `revisions`, `diff`, `stores`, `restore-store`, `ordered list`, `ordered get` |
+| Only with `--yes` | `set`, `reset`, `restore-key`, `delete-key`, `delete-store` |
+| Never | `copy`, `increment`, `snapshot`, and the `ordered` writes |
+
+The writes in the middle row stop and ask before they act, and a format that owns stdout cannot stop and ask: the prompt would land in the document, or in a pipeline where nobody can answer it. `--yes` answers in advance, so the pair is allowed, and `--json` without it is refused by the parser. The last row does not have the flag at all, so it is refused by the parser rather than at runtime.
 
 ### The stored value is nested, not escaped
 
@@ -323,7 +327,7 @@ They read real player data, so they say no more than the human form already says
 
 No `datastore` or `scope` key: this is the document you read before you have either. `id` is what every other subcommand takes as `--datastore`. `create_time` is **absent** when the response omitted it. `deleted` is only ever true with `--show-deleted`, since nothing else returns a soft-deleted store.
 
-### `data set --json`, and `reset`, `restore`, `delete`
+### `data set --json`, and `reset`, `restore-key`, `delete-key`
 
 ```json
 {
@@ -341,7 +345,7 @@ No `datastore` or `scope` key: this is the document you read before you have eit
 
 **Requires `--yes`.** `--json` refuses to prompt and every write asks for a confirmation, so the pair would either draw a prompt into a pipe or quietly skip a confirmation. Clap refuses the combination rather than either.
 
-`action` is the verb you asked for, not the one they share internally: `set`, `reset`, `restore`, `copy` or `delete`. `applied` is false for a dry run, which is a success that changed nothing, and telling those apart from the exit code alone is impossible. `existed` says whether the key was there before, so `set` reports whether it created one and `delete` reports whether it found anything to remove. `revision_id` is **absent** on a dry run and on a delete, and it is the field this document exists for: it is what `data revisions --revision` takes. `backup` is **absent** under `--no-backup` and when there was no previous value to copy.
+`action` is the verb you asked for, not the one they share internally: `set`, `reset`, `restore` or `delete`. `applied` is false for a dry run, which is a success that changed nothing, and telling those apart from the exit code alone is impossible. `existed` says whether the key was there before, so `set` reports whether it created one and `delete` reports whether it found anything to remove. `revision_id` is **absent** on a dry run and on a delete, and it is the field this document exists for: it is what `data revisions --revision` takes. `backup` is **absent** under `--no-backup` and when there was no previous value to copy.
 
 ### `data delete-store --json`, and `restore-store`
 

@@ -2,7 +2,7 @@
 
 Your own metrics: players, retention, revenue per payer.
 
-See the [README](../README.md) for install, keys and the safety model.
+See the [README](../README.md) for install, keys and the safety model. Needs `universe.analytics:read`.
 
 The Creator Dashboard already charts these. The reasons to pull them through an API are the three things it cannot do: keep history past Roblox's window, join the numbers with data of your own, and alert on a change without a human looking at a page.
 

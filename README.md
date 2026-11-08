@@ -33,10 +33,13 @@ cargo install --git https://github.com/rbx-forge/rbx-ops rbx-ops --locked
 `--env <name>` names an experience in the project's `rbxplace.toml`; `--universe-id` and `--place-id` name one directly, with no file at all.
 
 ```toml
+[owner]            # read by `group` when --group is not passed
+type = "group"
+id = 12345678
+
 [prod]
 universe_id = 9876543210
 places.main = 123456789012345
-confirm = true   # destructive writes on this env ask first
 
 [staging]
 universe_id = 9876543211
@@ -50,11 +53,7 @@ rbx-ops ban status builderman --universe-id 9876543210
 
 ## What kind of tool this is
 
-Everything here acts on state that only exists at runtime, and none of it comes from a file you commit.
-
-| | Acts on | Source of truth | A mistake costs |
-| --- | --- | --- | --- |
-| this tool | the live game | the live game | player data, irreversibly |
+Everything here acts on state that only exists at runtime, and none of it comes from a file you commit. The live game is both what it acts on and the source of truth, and a mistake costs player data, irreversibly.
 
 Banning a player has no desired state in a TOML file: it is a consequence of what happened in your game last night. So nothing here reconciles a repository against Roblox, and nothing here belongs in a pipeline that runs on every push.
 
@@ -68,13 +67,17 @@ These commands authenticate with an Open Cloud API key, from `--api-key` or `RBX
 | `analytics` | `universe.analytics:read` | read |
 | `ban status` / `list` / `logs` | `universe.user-restriction:read` | read |
 | `ban add` / `remove` | `universe.user-restriction:write` | **write** |
-| `group roles` / `members` | `group:read` | read |
+| `group roles` / `member` / `members` | `group:read` | read |
 | `group rank` / `unrank` | `group:read` + `group:write` | **write** |
 | `restart forecast` / `status` | `universe:read` | read |
 | `restart launch` | `universe:write` | **write** |
 | `data` reads | `universe-datastores.objects:read,list` | read |
 | `data` writes | `universe-datastores.objects:create,update` + `universe-datastores.control:create` | **write** |
-| `data revisions` / `restore` | `universe-datastores.versions:list,read` | read |
+| `data delete-key` | `universe-datastores.objects:delete` | **write** |
+| `data stores` | `universe-datastores.control:list` | read |
+| `data delete-store` / `restore-store` | `universe-datastores.control:delete` | **write** |
+| `data snapshot` | `universe-datastores.control:snapshot` | **write** |
+| `data revisions` / `restore-key` | `universe-datastores.versions:list,read` | read |
 | `data ordered` reads | `universe.ordered-data-store.scope.entry:read` | read |
 | `data ordered` writes | `universe.ordered-data-store.scope.entry:write` | **write** |
 | `memorystore get` / `list` | `memory-store.sorted-map:read` | read |
@@ -103,7 +106,7 @@ A `.ROBLOSECURITY` cookie is a complete account identity: not scoped to a univer
 
 ## Testing and fixtures
 
-Every client here is tested against **recorded production responses**, in `crates/rbx-*/tests/fixtures/`. Everything is byte for byte what Roblox sent, except four things replaced with synthetic values: `playerIds`, `jobId`, pagination tokens and analytics operation paths.
+The `servers` and `analytics` clients are tested against **recorded production responses**, in `crates/rbx-servers/tests/fixtures/` and `crates/rbx-analytics/tests/fixtures/`. Everything is byte for byte what Roblox sent, except four things replaced with synthetic values: `playerIds`, `jobId`, pagination tokens and analytics operation paths.
 
 The last two are not obvious. A pagination token is an opaque base64 blob, but decoding one shows Roblox packs real data inside it, including a `LastGameId` that is a live server's job id. The tests only ever ask whether a token exists, never what is in it, so an opaque placeholder costs nothing.
 

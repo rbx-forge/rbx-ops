@@ -6,8 +6,6 @@ The one Open Cloud storage surface a game server can read without an HTTP call. 
 
 See the [README](../README.md) for install, keys and the safety model.
 
-This page describes `main`. Check `rbx-ops --version` against what your `rokit.toml` pins.
-
 
 Needs `memory-store.sorted-map:read` to read and `:write` to write. Those scopes are **universe-targeted**, like the data store ones: a key restricted to one experience stays restricted to it.
 
@@ -72,7 +70,7 @@ rbx-ops memorystore --map Cache list --values --limit 500 --env prod
 
 `--json` on `get` and `list` writes one JSON document to stdout and nothing else. The expiry line, the item count and the "map is empty" line go to stderr, where they cannot corrupt it.
 
-The writes do not take it. `set` and `delete` report what they did in prose, and nothing in this crate needs to script off that.
+The writes do not take it. `set` and `delete` report what they did in prose, and nothing in this tool needs to script off that.
 
 ```sh
 rbx-ops memorystore --map Cache get rotation --env prod --json

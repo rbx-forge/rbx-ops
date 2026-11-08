@@ -4,8 +4,6 @@ Launch and steer Roblox ad campaigns.
 
 See the [README](../README.md) for install, keys and the safety model.
 
-This page describes `main`. Check `rbx-ops --version` against what your `rokit.toml` pins.
-
 
 **This command spends real money.** Every write is dry-run by default and needs `--apply`, and `launch` prints what a run will cost before it asks.
 

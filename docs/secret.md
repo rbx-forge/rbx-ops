@@ -16,8 +16,6 @@ HttpService:RequestAsync({
 
 Before this command, the only way to put a value there was the Creator Dashboard, by hand, one universe at a time. That is exactly the shape of chore that goes wrong quietly: staging keeps last quarter's key because somebody rotated production and stopped there.
 
-This page describes `main`. Check `rbx-ops --version` against what your `rokit.toml` pins.
-
 ## The value is encrypted before it is sent
 
 Roblox does not accept a secret in the clear, even over TLS. The content is sealed against the universe's own public key first, so what crosses the wire (and what lands in any corporate proxy's log along the way) is ciphertext that only this universe can open.
@@ -241,12 +239,7 @@ rbx-ops secret list --env prod --json \
 
 `set` needs the read scope despite only writing: fetching the public key is a read, and there is no way to seal a value without it.
 
-The scope is **universe-targeted**, so a key restricted to one experience stays restricted to it. Declare it in `rbxapikey.toml` like any other:
-
-```toml
-[keys.deploy]
-scopes = ["universe.secret:read,write"]
-```
+The scope is **universe-targeted**, so a key restricted to one experience stays restricted to it. In the Creator Hub it is listed under the experience you add to the key, as `universe.secret` with read and write.
 
 `universe.secret` is a BETA scope in Roblox's own document. It has been stable in practice, but treat a sudden `403` on a key that worked yesterday as a Roblox-side change rather than a bug in your config, and check the key's scopes in the Creator Hub.
 
