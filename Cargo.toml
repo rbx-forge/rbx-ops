@@ -1,0 +1,92 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rbx-ops",
+    "crates/rbx-servers",
+    "crates/rbx-analytics",
+    "crates/rbx-ban",
+    "crates/rbx-group",
+    "crates/rbx-restart",
+    "crates/rbx-data",
+    "crates/rbx-memorystore",
+    "crates/rbx-message",
+    "crates/rbx-secret",
+    "crates/rbx-ads",
+    "crates/rbx-user",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+# Set by a dependency, not by this workspace's own sources: `image`, which
+# arrives through `rbx-core`, declares 1.88. It moves when a dependency moves
+# it; the `msrv` CI job is what stops it moving silently.
+rust-version = "1.88"
+license = "MPL-2.0"
+repository = "https://github.com/rbx-forge/rbx-ops"
+homepage = "https://github.com/rbx-forge/rbx-ops"
+authors = ["rbx-forge"]
+keywords = ["roblox", "open-cloud", "cli", "live-ops"]
+categories = ["command-line-utilities", "game-development"]
+
+# Dev profile tuned for disk rather than for a debugger: a panic still names
+# the file and the line, which is what gets read.
+[profile.dev]
+debug = "line-tables-only"
+
+# Release profile tuned for a distributed CLI binary.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_debug_implementations = "warn"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+todo = "warn"
+dbg_macro = "warn"
+print_stdout = "allow"   # CLI tool, println! is intentional
+print_stderr = "allow"
+
+[workspace.dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+# Not `features = ["full"]`: tokio is here as reqwest's runtime, plus `macros`
+# for `#[tokio::main]` and `#[tokio::test]`, `time` for retry backoff and
+# polling, `sync` for the cached lookups.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+# rustls over the OS trust store rather than native-tls: on Linux native-tls is
+# OpenSSL linked dynamically, and a precompiled binary would then need the
+# exact libssl the build machine had. The OS trust store keeps trusting a
+# corporate proxy's CA, which webpki's baked-in roots would not.
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "multipart",
+    "gzip",
+    "charset",
+    "http2",
+    "rustls-tls-native-roots",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+colored = "2"
+chrono = { version = "0.4", features = ["serde"] }
+dialoguer = "0.11"
+tempfile = "3"
+wiremock = "0.6"
+# Secrets store encryption. Roblox takes a secret only as a LibSodium sealed
+# box under the universe's public key. `crypto_box` is pure Rust, so building
+# needs no C toolchain and the binary vendors no libsodium. Its default
+# features are kept because `seal` is built on `SalsaBox`, which needs them.
+crypto_box = { version = "0.9", features = ["seal"] }
+# The sealed ciphertext and the public key travel base64-encoded, standard
+# alphabet with padding.
+base64 = "0.22"
+# The Open Cloud HTTP client with its retry policy, the global flags,
+# `rbxplace.toml` resolution, user lookup and the Studio cookie consent. A
+# branch rather than a rev: Cargo.lock pins the exact commit, and
+# `cargo update -p rbx-core` is how a fix arrives.
+rbx-core = { git = "https://github.com/rbx-forge/rbx-cli", branch = "main" }

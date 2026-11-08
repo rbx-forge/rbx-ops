@@ -1,0 +1,46 @@
+[package]
+name = "rbx-ops"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Operate a live Roblox experience from the command line: servers, players, data, messages, secrets, ads"
+readme = "../../README.md"
+# crates.io refuses a crate with a git dependency, and this one has one. The
+# binary ships through GitHub releases.
+publish = false
+
+[[bin]]
+name = "rbx-ops"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+
+rbx-core.workspace = true
+rbx-servers = { path = "../rbx-servers" }
+rbx-analytics = { path = "../rbx-analytics" }
+rbx-ban = { path = "../rbx-ban" }
+rbx-group = { path = "../rbx-group" }
+rbx-restart = { path = "../rbx-restart" }
+rbx-data = { path = "../rbx-data" }
+rbx-memorystore = { path = "../rbx-memorystore" }
+rbx-message = { path = "../rbx-message" }
+rbx-secret = { path = "../rbx-secret" }
+rbx-ads = { path = "../rbx-ads" }
+rbx-user = { path = "../rbx-user" }
+
+# The `--json` contracts are about what reaches the process's streams, so they
+# can only be tested from outside the process: tests/json_*.rs run the binary.
+[dev-dependencies]
+assert_cmd = "2"
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+wiremock.workspace = true
+
+[lints]
+workspace = true

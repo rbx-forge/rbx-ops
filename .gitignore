@@ -1,0 +1,17 @@
+/target
+
+# Editor/tool configs
+.idea/
+.vscode/
+.zed/
+.claude/
+
+# `data` writes a backup of every entry it overwrites here, and those files are
+# real player data.
+.rbx/
+
+# A real project file dropped here for a manual test names private places and
+# the experiences they belong to. It belongs to a project, not to this
+# repository.
+/rbxplace.toml
+/.secrets/
