@@ -245,9 +245,7 @@ The scope is **universe-targeted**, so a key restricted to one experience stays 
 
 ```toml
 [keys.deploy]
-scopes = [
-  { type = "universe.secret", operations = ["read", "write"] },
-]
+scopes = ["universe.secret:read,write"]
 ```
 
 `universe.secret` is a BETA scope in Roblox's own document. It has been stable in practice, but treat a sudden `403` on a key that worked yesterday as a Roblox-side change rather than a bug in your config, and check the key's scopes in the Creator Hub.
