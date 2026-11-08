@@ -60,7 +60,7 @@ enum Command {
         /// The same names and descriptions, plus `exhaustive: false`: this
         /// list is what was confirmed against a live experience, not what
         /// exists, so it is not a whitelist to validate `--metric` against.
-        /// Field names are documented in docs/analytics.md.
+        /// Field names are documented in <https://rbx-forge.github.io/rbx-ops/analytics/>.
         #[arg(long)]
         json: bool,
     },
@@ -102,7 +102,7 @@ enum Command {
         /// series structure a breakdown creates, and the difference between a
         /// measured zero and a bucket with no value. stdout carries the
         /// document and nothing else; the waiting note and every warning stay
-        /// on stderr. Field names are documented in docs/analytics.md.
+        /// on stderr. Field names are documented in <https://rbx-forge.github.io/rbx-ops/analytics/>.
         ///
         /// Rejected together with `--csv`: the JSON document already carries
         /// everything the CSV does, so asking for both is a mistake rather

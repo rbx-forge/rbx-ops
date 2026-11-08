@@ -1,271 +1,176 @@
 # rbx-ops data
 
-Read, overwrite, copy and recover one data store entry.
-
-Deliberately narrow. Browsing, diffing revisions visually and restoring by clicking are better done in [DataStoria](https://github.com/this-fifo/DataStoria)'s editor than in a terminal, and this does not try to replace it. What it covers is the scriptable half, plus the two things a single-universe GUI cannot do at all: copying between environments, and running from a script.
-
-See the [README](../README.md) for install, keys and the safety model.
-
-Needs `universe-datastores.objects:read,update,create,list`, plus `universe-datastores.control:create,list` (the `control` scopes govern the **store**, `objects` govern its **entries**, and creating an entry in a store that does not exist yet needs both), plus `universe-datastores.versions:list,read` for `revisions` and `restore`, plus `universe-datastores.control:snapshot` for `snapshot`.
-
-## Why overwriting, not deleting
-
-Measured against a live universe, and the two are not symmetric:
-
-| | after `set` / `reset` | after `DELETE` |
-| --- | --- | --- |
-| a normal read | the new value | nothing, 404 |
-| the entry in a listing | present | present with `--show-deleted` |
-| the previous value | **gone at once** | **readable for 30 days** |
-
-Deleting is the obvious way to reset a player and the wrong one: the game then reads nothing, which behaves however your wrapper decides, and the old value stays readable for a month anyway.
-
-The surprising half is the last row. Writing an entry four times leaves only the fourth: `listRevisions` returns one row and an earlier revision by id answers `404 Entry not found at revision`, even though the revision counter did increment.
-
-**So by default an overwrite is unrecoverable through the API, and the backup file this writes before every write is not a convenience.**
-
-There is one way to change that in advance, and it has to be in advance: see [snapshots](#snapshots).
-
-## Resetting a player
-
-`--template <path>` names the profile to write; without it, `reset` reads `playerdata.template.json` from the working directory. There is no built-in default profile, because a fresh profile is a fact about your game and inventing one would write a shape the game does not read.
-
-```sh
-# reads playerdata.template.json by default
-rbx-ops data --datastore PlayerData reset Player_156 --env prod
-
-# or point at the one your game actually ships
-rbx-ops data --datastore PlayerData reset Player_156 --template assets/new-profile.json --env prod
-
-# for real
-rbx-ops data --datastore PlayerData reset Player_156 --env prod --apply
-```
-
-The dry run prints the current value beside the new one. On `--apply` the current value is written to `.rbx/backups/prod/Player_156-20260815T091500Z.json` before anything is sent, then you are prompted.
-
-### Where the backups go
-
-```
-.rbx/backups/<env>/<entry>-<UTC timestamp>.json
-```
-
-Beside `rbxplace.toml`, not in the working directory: the copy belongs to the project, so it is in the same place whether you ran the command from the repository root or from three directories down. One subdirectory per env, because the same entry key in staging and in prod are two different player profiles.
-
-The timestamp is not decoration. A fixed name like `<entry>.backup.json` means resetting the same player twice overwrites the copy of the value the first reset destroyed, and that older file is exactly the one worth having. Two writes inside the same second get a `-2` suffix rather than replacing each other.
-
-**Gitignore `.rbx/`.** These files are real player data. Add it next to your other ignores:
-
-```gitignore
-.rbx/
-```
-
-`--keep <n>` bounds the pile, defaulting to 10:
-
-```sh
-# keep the last 3 copies of this entry, delete older ones after the write
-rbx-ops data --datastore PlayerData reset Player_156 --env prod --keep 3 --apply
-```
-
-Retention counts the file it just wrote, applies to that entry only (one env's directory holds every key, and `--keep` on one player never evicts another's) and touches nothing it did not write. It is refused with `--backup` and `--no-backup`, which leave it nothing to do, and `--keep 0` is refused too: "no backup at all" is `--no-backup`, said plainly.
-
-Nothing prunes on a schedule or in the background. A directory only shrinks during a write to that same entry, so a key you stop touching keeps its history until you delete it yourself.
-
-### Skipping the local copy
-
-`--backup <path>` writes it exactly there instead, creating no directory around it and pruning nothing near it. `--no-backup` means there is none:
-
-```sh
-rbx-ops data --datastore PlayerData set Player_156 --value '{}' --no-backup --apply --yes
-```
-
-Two situations justify it. After [`data snapshot`](#snapshots), Roblox keeps the replaced value as a revision for 30 days, so the local copy is redundant for the next write to each key. And in a container with a read-only working directory there is nowhere to put it, without this flag the command fails before it sends anything, because the copy is written first on purpose.
-
-Outside those, it throws away the only way back. The command says so on every run rather than only in this page, and the two flags cannot be combined: one names where the copy goes, the other says there is none.
-
-## Removing an entry
-
-`RemoveAsync`, from outside the game.
-
-```sh
-rbx-ops data --datastore PlayerData delete-key Player_156 --env prod          # dry run
-rbx-ops data --datastore PlayerData delete-key Player_156 --env prod --apply
-```
-
-Spelled `delete-key`, beside `delete-store` below. The level is in the name on both, so neither reads as the default: `delete Player_156` and `delete-store PlayerData` would be one glance apart in a shell history, and only one of them is recoverable by re-running the game. There is no bare `delete` or `restore` for the same reason.
-
-Despite the name it is the **gentler** of the two ways to start a player over. A normal read then answers nothing, so a game that builds a fresh profile when it finds none builds one, from its own template rather than from a copy of that template you have to keep in step. And the value survives: the entry stays in a listing with `--show-deleted`, and its last value stays readable through `data revisions` for thirty days. `set` and `reset` destroy it the moment they land.
-
-The local copy is written first anyway, because thirty days is a deadline and a file is not. A key that does not exist is reported and nothing is sent.
-
-Needs `universe-datastores.objects:delete`.
-
-**One ordering matters.** A live session holding that profile in memory writes it back when it ends, undoing this. Delete while nobody is in the experience, or end the session from inside the game first. Resetting yourself mid-playtest is the in-game job, not this one.
-
-## Reading and writing
+Read, overwrite, copy and recover data store entries, from a script or across envs. For browsing and visual diffs, a GUI such as [DataStoria](https://github.com/this-fifo/DataStoria) is better.
 
 ```sh
 rbx-ops data --datastore PlayerData get Player_156 --env prod
-rbx-ops data --datastore PlayerData get Player_156 --env prod --out profile.json
+rbx-ops data --datastore PlayerData reset Player_156 --env prod --apply
+rbx-ops data --datastore PlayerData copy Player_156 --from prod --to staging --apply
+```
 
+`--datastore` names the store and `--scope` its scope (default `global`; a wrong scope reads as "not found"). Writes are dry runs without `--apply`, and ask before writing.
+
+!!! warning "An overwrite cannot be undone through the API"
+    After `set` or `reset`, the previous value is gone at once: Roblox keeps no revision of it, unless a [snapshot](#rbx-ops-data-snapshot) was taken before. So every write first saves the current value to `.rbx/backups/<env>/<entry>-<UTC time>.json`. Add `.rbx/` to `.gitignore`: it is player data.
+
+## Entries
+
+### rbx-ops data get
+
+`rbx-ops data get <entry>`
+
+| Flag | Meaning |
+| --- | --- |
+| `--out <path>` | Write the value to a file |
+| `--json` | One JSON document |
+
+### rbx-ops data set
+
+`rbx-ops data set <entry>`
+
+```sh
 rbx-ops data --datastore PlayerData set Player_156 --value '{"coins":0}' --env prod --apply
 rbx-ops data --datastore PlayerData set Player_156 --file profile.json --env prod --apply
-
-# atomic, unlike read-then-write: two grants at once both land
-rbx-ops data --datastore PlayerData increment Coins_156 --by 500 --env prod --apply
 ```
 
-An overwrite **keeps the entry's `users` and `attributes`** unless you pass `--drop-metadata`. `users` is the association Roblox uses to answer a player's data request, and sending only `value` would sever it silently.
+| Flag | Meaning |
+| --- | --- |
+| `--value <json>` / `--file <path>` | The new value |
+| `--drop-metadata` | Also drop the entry's `users` and `attributes` (kept by default: `users` is how Roblox answers a player's data request) |
+| backup flags | See [Backups](#backups) |
+| `--apply`, `--yes`, `--json` | As above; `--json` needs `--yes` |
 
-## Finding stores
+### rbx-ops data reset
 
-The command to run when you do not yet know what to put in `--datastore`.
+`rbx-ops data reset <entry>`
 
-```sh
-rbx-ops data stores --env prod
-rbx-ops data stores --show-deleted --env prod
-```
+Overwrite with a fresh profile: `--template <path>`, or `playerdata.template.json` in the working directory. There is no built-in profile. The dry run shows the current value beside the new one. Takes the backup flags, `--apply`, `--yes`, `--json`.
 
-Experience-wide, so it takes neither `--datastore` nor `--scope`. Needs `universe-datastores.control:list`.
+### rbx-ops data delete-key
 
-A store exists **from its first write**, not from the first `GetDataStore`, so a name that is absent here is a store the game has never written to. That also explains the names you did not choose: a game running in Studio writes wherever its own wrapper points, so a `-studio` twin of the live store is normal, and a wrapper library keeps its bookkeeping in a store of its own next to the data it manages.
+`rbx-ops data delete-key <entry>`
 
-## Removing a store
+`RemoveAsync`, from outside the game. Gentler than a reset: the game sees no entry and builds its own fresh profile, and the old value stays readable through `revisions` for thirty days. Takes the backup flags, `--apply`, `--yes`, `--json`. Needs `universe-datastores.objects:delete`.
 
-The level above `delete-key`, and it exists to close an asymmetry. A store comes into being from the first write to a name nobody created, so without this command a tool could make one by accident and only the Creator Hub could remove it.
+!!! warning "Delete while the player is offline"
+    A live session still holding the profile writes it back when it ends, undoing the delete or reset.
 
-```sh
-rbx-ops data delete-store Sessions --env prod          # dry run
-rbx-ops data delete-store Sessions --env prod --apply
-rbx-ops data restore-store Sessions --env prod --apply
-```
+### rbx-ops data increment
 
-**It names its store positionally, and ignores `--datastore`.** That flag is the store the other subcommands happen to be pointed at, often from a shell alias or a script's preamble; a store being destroyed should be named in the command that destroys it.
+`rbx-ops data increment <entry> --by <n>`
 
-**It asks for the name typed back, not for a `y`.** The mistake worth catching here is not running the command, it is running it on the wrong store, and a name that arrived from a shell history answers `y` exactly as readily as one that was read off `data stores`. `--yes` skips it, because a script that names the wrong store was going to type the wrong name too.
+Atomic add: two concurrent grants both land, unlike read-then-set. `--apply`, `--yes`.
 
-Soft, like `delete-key`: the store stays in `data stores --show-deleted`, and `restore-store` brings it back. **How long that lasts is not documented by Roblox**, so this page does not claim a window the way the thirty days for an entry is claimed. Check `data stores --show-deleted` rather than assuming.
+### rbx-ops data copy
 
-Both need `universe-datastores.control:delete`, and that is not a typo: Roblox puts `:undelete` under the delete scope rather than giving it one of its own, so a key that can remove a store can always put it back. Worth knowing when writing a key that should be able to do neither, because there is no narrower grant that allows only the undo.
+`rbx-ops data copy <entry> --from <env> --to <env>`
 
-## Finding keys
+Copy an entry between envs, to reproduce a bug on real data. `--to-entry <key>` writes under another key. Both envs are explicit, and the destination keeps its own `users`. Takes the backup flags, `--apply`, `--yes`.
 
-```sh
-rbx-ops data --datastore PlayerData list --env prod
-rbx-ops data --datastore PlayerData list --prefix Player_ --env prod
-rbx-ops data --datastore PlayerData list --show-deleted --env prod
-```
+### rbx-ops data list
 
-Every subcommand also takes `--scope`, the data store scope, defaulting to `global`. Leave it alone unless your game writes with an explicit scope: a key written under one scope is invisible from another, so a wrong `--scope` reads as "entry not found" rather than as an error.
+Keys of the store.
 
-## Snapshots
+| Flag | Meaning |
+| --- | --- |
+| `--prefix <p>` | Keys starting with this |
+| `--show-deleted` | Include deleted entries |
+| `--limit <n>` | Maximum keys |
+| `--json` | `{ datastore, scope, prefix, show_deleted, limit, limit_reached, count, entries: [{ id }] }` |
 
-The one thing that makes an overwrite survivable, and it only works if you do it **before** the write.
+### rbx-ops data revisions
 
-```sh
-rbx-ops data snapshot --env prod            # dry run
-rbx-ops data snapshot --env prod --apply
-```
+`rbx-ops data revisions <entry>`
 
-After a snapshot, the next write to *every* key in the experience keeps the value it replaced as a revision, guaranteed readable for 30 days. That is exactly the guarantee the table above says you do not normally get. It covers one overwrite per key: the second write of the day replaces the first without keeping it.
+The revisions Roblox kept: after a delete, or after a snapshot. Expect fewer than you wrote. `--revision <id>` prints that revision's value. `--json`.
 
-Roblox allows **one snapshot per experience per UTC day**. A second call the same day is not an error: it reports the standing snapshot's time and changes nothing.
+### rbx-ops data restore-key
 
-That cap is why this takes `--apply` even though a snapshot can only ever add recoverability. Spending the day's snapshot early is not free: one taken at 09:00 protects the values as of 09:00, so a key written at 10:00 and again at 17:00 keeps the 09:00 value, not the 10:00 one. Take it immediately before the risky write, not at the start of the day out of habit.
+`rbx-ops data restore-key <entry> --revision <id>`
 
-Experience-wide, so it takes neither `--datastore` nor `--scope`. Needs `universe-datastores.control:snapshot`.
+Write a revision back. Takes the backup flags, `--apply`, `--yes`, `--json`. Without a revision to restore, put a backup back with `set --file .rbx/backups/<env>/<file>.json`.
 
-## Recovering
+### rbx-ops data diff
 
-```sh
-rbx-ops data --datastore PlayerData revisions Player_156 --env prod
-rbx-ops data --datastore PlayerData revisions Player_156 --revision <id> --env prod
-rbx-ops data --datastore PlayerData restore-key Player_156 --revision <id> --env prod --apply
-```
-
-Expect fewer revisions than you wrote, for the reason above. This is mostly useful after a delete, where the value from before survives, or after a snapshot, which is what puts a revision there to find. To undo an overwrite with neither, use the backup file: `ls .rbx/backups/<env>/` lists them newest last, and putting one back is `set --file`:
-
-```sh
-rbx-ops data --datastore PlayerData set Player_156 \
-  --file .rbx/backups/prod/Player_156-20260815T091500Z.json --env prod --apply
-```
-
-## Copying between environments
-
-The one a single-universe tool cannot do: pull a profile from production into staging to reproduce a bug on real data, or onto a test account.
-
-```sh
-rbx-ops data --datastore PlayerData copy Player_156 --from prod --to staging --apply
-rbx-ops data --datastore PlayerData copy Player_156 --from prod --to dev --to-entry Player_999 --apply
-```
-
-Source and destination are both named explicitly and neither falls back to `--env`, so nothing is copied because a flag was forgotten. The **destination's** `users` is kept, not the source's: attaching one player's association to another player's key is not a copy anybody means to make.
-
-## Comparing
+`rbx-ops data diff <entry>`
 
 ```sh
 rbx-ops data --datastore PlayerData diff Player_156 --revisions <a>,<b> --env prod --open
 rbx-ops data --datastore PlayerData diff Player_156 --between prod,staging --open
 ```
 
-Both sides are written to files and handed to a diff tool: `$RBX_DIFF_TOOL` if set, else `code --diff`, else `git diff --no-index`. Without `--open` the two paths are printed for you to open however you like.
+Both sides are written to files. `--open` hands them to `$RBX_DIFF_TOOL`, else `code --diff`, else `git diff --no-index`; otherwise the paths are printed. `--json` gives the two paths, and cannot be combined with `--open`.
 
-That is DataStoria's best screen, obtained without writing a diff viewer, and it works for people who do not use VS Code.
+## Backups
 
+Before every overwrite, the current value goes to `.rbx/backups/<env>/<entry>-<UTC time>.json`, next to `rbxplace.toml`.
+
+| Flag | Meaning |
+| --- | --- |
+| `--keep <n>` | Keep the last `n` copies of this entry (default 10) |
+| `--backup <path>` | Write the copy exactly there instead |
+| `--no-backup` | No copy. Only after a snapshot, or where nothing can be written |
+
+## Stores
+
+### rbx-ops data stores
+
+Every store of the experience. A store exists from its first write.
+
+| Flag | Meaning |
+| --- | --- |
+| `--show-deleted` | Include deleted stores |
+| `--limit <n>` | Maximum stores |
+| `--json` | `{ show_deleted, limit, count, limit_reached, stores: [{ id, create_time, deleted }] }` |
+
+### rbx-ops data delete-store
+
+`rbx-ops data delete-store <store>`
+
+The store is named positionally; `--datastore` is ignored. With `--apply`, you type the store's name back to confirm (`--yes` skips). Deleted stores are listed by `stores --show-deleted` and come back with `restore-store`; Roblox does not say for how long. `--json` needs `--yes`.
+
+### rbx-ops data restore-store
+
+`rbx-ops data restore-store <store>`
+
+Undo a `delete-store`. `--apply`, `--json`. Both need `universe-datastores.control:delete`, which also grants the undo.
+
+### rbx-ops data snapshot
+
+After a snapshot, the next write to **every** key keeps the replaced value as a revision for 30 days. One per experience per UTC day (a second call reports the first). It protects values as they were when taken, so take it right before the risky write. `--apply`. Needs `universe-datastores.control:snapshot`.
 
 ## Ordered data stores
 
-`rbx-ops data ordered` is the leaderboard resource: a different Open Cloud resource from everything above, not a mode of it. Values are integers, ordering happens on Roblox's side, and there is **no revision history at all**.
-
-That last point is why nothing here writes a backup file. The backups the rest of this page insists on exist because an overwrite to a standard store destroys a JSON document that only a local copy can bring back. An ordered entry is one integer, and there is nothing to reconstruct.
-
-`--datastore` names the store, the same flag as above, and `--scope` applies.
+Leaderboards: integer values, sorted by Roblox, no revisions and no backups.
 
 ```sh
-# The top ten
 rbx-ops data ordered list --datastore Highscores --env prod
-
-# The top 100, ascending, only scores between 1000 and 5000
 rbx-ops data ordered list --datastore Highscores --limit 100 --asc --min 1000 --max 5000
-
 rbx-ops data ordered get Player_156 --datastore Highscores
 rbx-ops data ordered set Player_156 4200 --datastore Highscores
 rbx-ops data ordered increment Player_156 -50 --datastore Highscores
 rbx-ops data ordered delete Player_156 --datastore Highscores
 ```
 
-| Verb | What it does |
+| Verb | Does |
 | --- | --- |
-| `list` | The leaderboard. Descending by default: "the top players" is the reason the resource exists, so ascending is the case that takes a flag |
-| `get <entry>` | One value. A key nobody has written prints a note, not an error |
-| `set <entry> <value>` | Exact value, creating the entry when absent. `--no-create` refuses instead |
-| `increment <entry> <amount>` | Atomic add. Negative subtracts |
-| `delete <entry>` | Removes the entry. Deleting one that is not there is a no-op, not a failure |
+| `list` | Descending by default. `--limit`, `--asc`, `--min`, `--max` (applied by Roblox), `--json` |
+| `get <entry>` | One value. `--json` |
+| `set <entry> <value>` | Exact value, creating it unless `--no-create` |
+| `increment <entry> <n>` | Atomic add; negative subtracts. Prefer it whenever two writers touch a key |
+| `delete <entry>` | Remove |
 
-`--limit`, `--min` and `--max` are all applied by Roblox, not after the fact: a listing sorted or filtered locally would give the top of page one rather than the top of the store. `--min`/`--max` become one `filter` expression, which is the only comparison grammar the endpoint accepts.
+The writes ask first, showing the current value; `--yes` skips. Scopes: `universe.ordered-data-store.scope.entry:read` to read, `:write` to write.
 
-**Reach for `increment` over `set` whenever more than one writer touches a key.** A read-then-set from two places loses one of the two updates; the increment endpoint does not.
-
-`set`, `increment` and `delete` ask before writing, and `set` and `delete` name the current value in the prompt: there is no revision history to look it up in afterwards. `-y` / `--yes` skips the prompt.
-
-**What is deliberately missing**: `snapshot`, `revisions`, `restore`, `diff`. Roblox offers none of them on this resource, and a command answering "not supported" for four of its verbs would be worse than not having them.
-
-Scopes: `universe.ordered-data-store.scope.entry:read` for `list` and `get`, `:write` for the rest.
-
-## Machine-readable output
-
-`--json` writes one JSON document to stdout and nothing else. Everything that is not the result (the revision line, the key count, "No entry", the unknown-key warning from `rbxplace.toml`) goes to stderr, so `jq` reads the pipe and a human still reads the terminal.
+## `--json`
 
 | Takes `--json` | Subcommands |
 | --- | --- |
 | Always | `get`, `list`, `revisions`, `diff`, `stores`, `restore-store`, `ordered list`, `ordered get` |
-| Only with `--yes` | `set`, `reset`, `restore-key`, `delete-key`, `delete-store` |
-| Never | `copy`, `increment`, `snapshot`, and the `ordered` writes |
+| With `--yes` only | `set`, `reset`, `restore-key`, `delete-key`, `delete-store` |
+| Never | `copy`, `increment`, `snapshot`, the `ordered` writes |
 
-The writes in the middle row stop and ask before they act, and a format that owns stdout cannot stop and ask: the prompt would land in the document, or in a pipeline where nobody can answer it. `--yes` answers in advance, so the pair is allowed, and `--json` without it is refused by the parser. The last row does not have the flag at all, so it is refused by the parser rather than at runtime.
-
-### The stored value is nested, not escaped
-
-A player profile is already JSON, and it goes into the document as JSON, under a `value` key:
+The stored value is nested as JSON, not escaped into a string, so `jq .value.coins` works:
 
 ```json
 {
@@ -276,58 +181,13 @@ A player profile is already JSON, and it goes into the document as JSON, under a
   "found": true,
   "deleted": false,
   "revision_id": "08DEF1A1B5E3ADA9.0000000002.01",
-  "value": {
-    "coins": 500,
-    "level": 12,
-    "inventory": ["hat", "sword"]
-  }
+  "value": { "coins": 500, "level": 12 }
 }
 ```
 
-So `jq .value.coins` works, and a profile stored as `500` reads back as the number `500` rather than the string `"500"`.
+`found` is `false` for a missing key (exit `0`). `value` is absent with `--out` (then `out` holds the path). `users` and `attributes` are never included.
 
-The worry about nesting arbitrary data is a worry about *spreading* it. Nothing of ours lives inside `value`, so a profile with a `schema_version` key of its own is `.value.schema_version` and collides with nothing. Escaping the value into a string would have bought back a namespace that was never at risk, at the cost of `jq -r .value | jq .coins` and of every stored number becoming quoted.
-
-### What these documents do not say
-
-They read real player data, so they say no more than the human form already says out loud.
-
-**`users` and `attributes` are not in any of them.** `users` is the `users/156` association Roblox answers a player's data request from. It is on every entry this command fetches, `data get` has never printed it, and a second player identifier landing in whatever collects your CI output is not a field anybody asked for. `path`, `etag` and `createTime` are absent for the duller version of the same reason: unprinted today, so unpromised today.
-
-**`diff` carries paths, not values.** Both sides are already written to files; putting two profiles through the pipe as well would say more than the human form ever has.
-
-### `data get --json`
-
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `schema_version` | integer | Document format, the same in every `--json` document of this tool. `1` today. Refuse a version you do not understand |
-| `datastore` / `scope` | string | The store this was read from, as `--datastore` and `--scope` named it |
-| `entry` | string | The key that was asked for |
-| `found` | boolean | False when there is no such key. Exit code is 0 either way, the same non-event the human form prints as "No entry" |
-| `deleted` | boolean | True when the entry is soft-deleted and still readable. Roblox purges it thirty days after the delete |
-| `revision_id` | string | The revision the value came from. **Absent** when Roblox did not say, and when there is no entry |
-| `value` | any | The stored value, nested. **Absent** under `--out` and when there is no entry. A present `null` is a real answer: a stored `null` and an entry with no value cannot be told apart, and the game cannot tell either |
-| `out` | string | Where `--out` wrote the value. **Absent** without `--out` |
-
-### `data stores --json`
-
-```json
-{
-  "schema_version": 1,
-  "show_deleted": false,
-  "limit": 100,
-  "count": 2,
-  "limit_reached": false,
-  "stores": [
-    { "id": "PlayerData-v1", "create_time": "2026-08-27T16:41:02Z", "deleted": false },
-    { "id": "Tickets-prod", "create_time": "2026-08-27T16:41:01Z", "deleted": false }
-  ]
-}
-```
-
-No `datastore` or `scope` key: this is the document you read before you have either. `id` is what every other subcommand takes as `--datastore`. `create_time` is **absent** when the response omitted it. `deleted` is only ever true with `--show-deleted`, since nothing else returns a soft-deleted store.
-
-### `data set --json`, and `reset`, `restore-key`, `delete-key`
+Writes report:
 
 ```json
 {
@@ -343,129 +203,17 @@ No `datastore` or `scope` key: this is the document you read before you have eit
 }
 ```
 
-**Requires `--yes`.** `--json` refuses to prompt and every write asks for a confirmation, so the pair would either draw a prompt into a pipe or quietly skip a confirmation. Clap refuses the combination rather than either.
+`action` is `set`, `reset`, `restore` or `delete`; `applied` is `false` on a dry run; `revision_id` is what `revisions --revision` takes. Store writes report `{ datastore, action: "delete-store" | "restore-store", applied }`.
 
-`action` is the verb you asked for, not the one they share internally: `set`, `reset`, `restore` or `delete`. `applied` is false for a dry run, which is a success that changed nothing, and telling those apart from the exit code alone is impossible. `existed` says whether the key was there before, so `set` reports whether it created one and `delete` reports whether it found anything to remove. `revision_id` is **absent** on a dry run and on a delete, and it is the field this document exists for: it is what `data revisions --revision` takes. `backup` is **absent** under `--no-backup` and when there was no previous value to copy.
+## Scopes
 
-### `data delete-store --json`, and `restore-store`
-
-```json
-{
-  "schema_version": 1,
-  "datastore": "Sessions",
-  "action": "delete-store",
-  "applied": true
-}
-```
-
-A different document from the one above, deliberately, rather than that one with empty fields. These act on a store, so there is no entry and no scope to name, and a receipt carrying `"entry": ""` would invite a consumer to read it as an entry that happened to be unnamed.
-
-`action` is `delete-store` or `restore-store`. `applied` carries the meaning it does everywhere else here: false for a dry run.
-
-`delete-store --json` **requires `--yes`**, for the reason the writes above do. `restore-store --json` does not: restoring takes nothing away, so there is no confirmation for `--json` to collide with.
-
-### `data list --json`
-
-```json
-{
-  "schema_version": 1,
-  "datastore": "PlayerData",
-  "scope": "global",
-  "prefix": "Player_",
-  "show_deleted": false,
-  "limit": 100,
-  "limit_reached": false,
-  "count": 2,
-  "entries": [{ "id": "Player_156" }, { "id": "Player_881" }]
-}
-```
-
-`prefix` is **absent** when the listing was unfiltered, which is not the same as a prefix of `""`. `limit_reached` says the run stopped at `--limit` rather than at the end of the store, so a script knows to raise it instead of concluding the store is small. A prefix that matches nothing is an empty `entries` array and exit 0, never silence.
-
-Entries are objects rather than bare strings, so `.entries[].id` keeps working the day a listing carries a second field.
-
-### `data revisions --json`
-
-Two documents, and `--revision` is what picks between them. Without it, the list:
-
-```json
-{
-  "schema_version": 1,
-  "datastore": "PlayerData",
-  "scope": "global",
-  "entry": "Player_156",
-  "count": 2,
-  "revisions": [
-    {
-      "revision_id": "08DEF1A1B5E3ADA9.0000000002.01",
-      "create_time": "2026-08-15T09:15:00.1234567Z",
-      "state": "DELETED",
-      "deleted": true
-    },
-    {
-      "revision_id": "08DEF1A1B5E3ADA9.0000000001.01",
-      "create_time": "2026-08-14T11:02:33.0000000Z",
-      "state": "ACTIVE",
-      "deleted": false
-    }
-  ]
-}
-```
-
-`create_time` keeps Roblox's full precision, where the table shortens it to the second. `deleted` is derived from `state` so a consumer does not keep its own list of spellings.
-
-With `--revision <id>`, that revision's value instead, under the same `value` rule as `get`:
-
-```json
-{
-  "schema_version": 1,
-  "datastore": "PlayerData",
-  "scope": "global",
-  "entry": "Player_156",
-  "revision_id": "08DEF1A1B5E3ADA9.0000000001.01",
-  "value": { "coins": 500 }
-}
-```
-
-### `data diff --json`
-
-```json
-{
-  "schema_version": 1,
-  "datastore": "PlayerData",
-  "scope": "global",
-  "entry": "Player_156",
-  "left": {
-    "label": "prod-Player_156",
-    "path": "/tmp/prod-Player_156.json",
-    "env": "prod"
-  },
-  "right": {
-    "label": "staging-Player_156",
-    "path": "/tmp/staging-Player_156.json",
-    "env": "staging"
-  }
-}
-```
-
-Each side carries `revision` under `--revisions` and `env` under `--between`, exactly one of the two, so a consumer reads which comparison it got rather than parsing `label` apart.
-
-`--json` and `--open` are refused together. `--open` hands stdout to `git diff --no-index` and the terminal to `code --diff`, either of which would write somebody else's output into the document.
-
-```sh
-# hand the pair to your own tool
-rbx-ops data --datastore PlayerData diff Player_156 --between prod,staging --json \
-  | jq -r '.left.path, .right.path' | xargs delta
-```
-
-## Exporting
-
-`get --out` writes one value. For history, `list` the keys and `get` each: entry listings only carry ids, so reading values is one call per entry and this makes no attempt to hide that cost.
-
-```sh
-rbx-ops data --datastore PlayerData list --prefix Player_ --limit 500 --env prod --json \
-  | jq -r '.entries[].id' \
-  | while read -r key; do
-      rbx-ops data --datastore PlayerData get "$key" --env prod --json > "backup-$key.json"
-    done
-```
+| Use | Scope |
+| --- | --- |
+| Read entries | `universe-datastores.objects:read,list` |
+| Write entries | `universe-datastores.objects:create,update` and `universe-datastores.control:create` |
+| `delete-key` | `universe-datastores.objects:delete` |
+| `revisions`, `restore-key` | `universe-datastores.versions:list,read` |
+| `stores` | `universe-datastores.control:list` |
+| `delete-store`, `restore-store` | `universe-datastores.control:delete` |
+| `snapshot` | `universe-datastores.control:snapshot` |
+| Ordered stores | `universe.ordered-data-store.scope.entry:read` / `:write` |

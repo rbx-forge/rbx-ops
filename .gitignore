@@ -15,3 +15,6 @@
 # repository.
 /rbxplace.toml
 /.secrets/
+
+# mkdocs build output
+/site

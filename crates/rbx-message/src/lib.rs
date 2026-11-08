@@ -90,7 +90,7 @@ pub struct MessageCli {
     ///
     /// The receipt of a publish that cannot be recalled: the topic, the
     /// universe, the byte count, and whether it was sent or only planned.
-    /// Field names are documented in docs/message.md.
+    /// Field names are documented in <https://rbx-forge.github.io/rbx-ops/message/>.
     #[arg(long)]
     json: bool,
 

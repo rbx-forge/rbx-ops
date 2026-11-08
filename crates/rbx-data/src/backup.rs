@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use colored::Colorize;
 
-/// Project-local state directory. Player data lands here, so `docs/data.md`
+/// Project-local state directory. Player data lands here, so <https://rbx-forge.github.io/rbx-ops/data/>
 /// tells the reader to gitignore it.
 const STATE_DIR: &str = ".rbx";
 

@@ -1,44 +1,28 @@
 # rbx-ops user
 
-A username to a user id, or an id to a username. No API key, no file: the lookup is public.
+A username to a user id, or the reverse. Public: no key, no file. Hidden from `--help`.
 
-```bash
+```sh
 rbx-ops user builderman
 rbx-ops user 156 builderman name:12345
 rbx-ops user builderman --id
-rbx-ops user 156 --name
-rbx-ops user builderman --json
 ```
 
-## Naming a user
-
-Every argument takes what [`rbx-ops ban`](ban.md#naming-a-player) takes, mixed freely:
-
-```text
-156                                        a user id
-builderman                                 a username
-name:12345                                 a username that looks like an id
-@12345                                     the same, but see the PowerShell note
-https://www.roblox.com/users/156/profile   a pasted profile link
-```
-
-**On PowerShell, use `name:` and not `@`.** `@` is the splatting operator there, so an unquoted `@builderman` vanishes before the program sees it.
-
-A name or an id Roblox does not know is an **error** naming it, never a silently missing line. Usernames are not display names: the name people quote from a chat is often the display name, which is neither unique nor what this resolves.
-
-## Output
-
-Without a flag, one line per user, in the order given, with the display name when it differs:
+Arguments take what [`ban`](ban.md#naming-a-player) takes. An unknown name or id is an error. Display names are not usernames.
 
 ```text
 builderman (156)
 somebody "Some Body" (1234567890)
 ```
 
-`--id` and `--name` print the bare value, one per line, in the order given. They exist to compose with commands that take an id inside something else, which `rbx-ops` cannot resolve for you because only the game knows the shape. A data store key is the usual case:
+| Flag | Prints |
+| --- | --- |
+| `--id` | The bare id, one per line |
+| `--name` | The bare username, one per line |
+| `--json` | An array of `{ user_id, username, display_name, has_verified_badge, profile_url }` |
 
-```powershell
-rbx-ops data get --datastore PlayerData "User_$(rbx-ops user builderman --id)"
+`--id` composes with keys that embed an id:
+
+```sh
+rbx-ops data --datastore PlayerData get "User_$(rbx-ops user builderman --id)" --env prod
 ```
-
-`--json` prints an array, each entry with `user_id` (a string, as everywhere in this tool), `username`, `display_name`, `has_verified_badge` and `profile_url`.

@@ -73,7 +73,7 @@ enum Command {
         /// are restricted, and (when they are) the length and both reasons,
         /// the same facts the human form prints. stdout carries the document
         /// and nothing else; notes and warnings stay on stderr. Field names are
-        /// documented in docs/ban.md.
+        /// documented in <https://rbx-forge.github.io/rbx-ops/ban/>.
         #[arg(long)]
         json: bool,
     },
@@ -94,7 +94,7 @@ enum Command {
         /// active, whether it is permanent, and the private note. No names:
         /// this endpoint does not send them. stdout carries the document and
         /// nothing else; notes and warnings stay on stderr. Field names are
-        /// documented in docs/ban.md.
+        /// documented in <https://rbx-forge.github.io/rbx-ops/ban/>.
         #[arg(long)]
         json: bool,
     },

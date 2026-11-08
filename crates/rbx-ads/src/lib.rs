@@ -154,7 +154,7 @@ enum Command {
         /// Budgets carry both the exact micro-USD Roblox sent and the dollar
         /// figure the table prints, neither as a JSON number. stdout carries
         /// the document and nothing else; diagnostics stay on stderr. Field
-        /// names are documented in docs/ads.md.
+        /// names are documented in <https://rbx-forge.github.io/rbx-ops/ads/>.
         #[arg(long)]
         json: bool,
     },
@@ -168,7 +168,7 @@ enum Command {
         ///
         /// The campaign sits under `campaign`, the same object `list` puts in
         /// `campaigns`, so one filter reads either. Field names are documented
-        /// in docs/ads.md.
+        /// in <https://rbx-forge.github.io/rbx-ops/ads/>.
         #[arg(long)]
         json: bool,
     },
@@ -183,7 +183,7 @@ enum Command {
         ///
         /// Answered ids and refused ones stay in separate arrays, so a script
         /// cannot read an id Roblox never answered for as a campaign that is
-        /// not serving. Field names are documented in docs/ads.md.
+        /// not serving. Field names are documented in <https://rbx-forge.github.io/rbx-ops/ads/>.
         #[arg(long)]
         json: bool,
     },

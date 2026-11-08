@@ -50,7 +50,7 @@ enum Command {
         ///
         /// Carries the versions and names the default one, so a script can
         /// feed `servers list` without knowing that the order is newest
-        /// first. Field names are documented in docs/servers.md.
+        /// first. Field names are documented in <https://rbx-forge.github.io/rbx-ops/servers/>.
         #[arg(long)]
         json: bool,
     },
@@ -90,7 +90,7 @@ enum Command {
         /// facts a row cannot hold: whether the page was partial, and whether
         /// --limit was reached. stdout carries the document and nothing else;
         /// diagnostics stay on stderr. Field names are documented in
-        /// docs/servers.md.
+        /// <https://rbx-forge.github.io/rbx-ops/servers/>.
         #[arg(long, conflicts_with_all = ["csv", "full"])]
         json: bool,
     },
@@ -126,7 +126,7 @@ enum Command {
         /// of a finished log rather than following a live one, so a line
         /// stream would buy no earlier output and would lose the facts about
         /// the run. `jq -c '.lines[]'` produces JSON Lines from it. Field
-        /// names are documented in docs/servers.md.
+        /// names are documented in <https://rbx-forge.github.io/rbx-ops/servers/>.
         #[arg(long, conflicts_with = "csv")]
         json: bool,
     },

@@ -63,7 +63,7 @@ pub(crate) enum Command {
         /// the entry's user association and attributes stay out, as they do
         /// in the human form. stdout carries the document and nothing else;
         /// diagnostics stay on stderr. Field names are documented in
-        /// docs/data.md.
+        /// <https://rbx-forge.github.io/rbx-ops/data/>.
         #[arg(long)]
         json: bool,
     },
@@ -121,7 +121,7 @@ pub(crate) enum Command {
         /// it was applied or was a dry run, whether the entry existed, the
         /// revision it is at now, and where the backup went. stdout carries
         /// the document and nothing else. Field names are documented in
-        /// docs/data.md.
+        /// <https://rbx-forge.github.io/rbx-ops/data/>.
         ///
         /// Requires `--yes`. `OutputFormat::Json` refuses to prompt and every
         /// write here asks through `confirm_always`, so the pair would either
@@ -221,7 +221,7 @@ pub(crate) enum Command {
         /// it was applied or was a dry run, whether the entry existed, the
         /// revision it is at now, and where the backup went. stdout carries
         /// the document and nothing else. Field names are documented in
-        /// docs/data.md.
+        /// <https://rbx-forge.github.io/rbx-ops/data/>.
         ///
         /// Requires `--yes`. `OutputFormat::Json` refuses to prompt and every
         /// write here asks through `confirm_always`, so the pair would either
@@ -262,7 +262,7 @@ pub(crate) enum Command {
         /// The names, plus what the human form prints around them: the count,
         /// and whether the run stopped at --limit rather than at the end of
         /// the experience. stdout carries the document and nothing else. Field
-        /// names are documented in docs/data.md.
+        /// names are documented in <https://rbx-forge.github.io/rbx-ops/data/>.
         #[arg(long)]
         json: bool,
     },
@@ -358,7 +358,7 @@ pub(crate) enum Command {
         /// The keys, plus what the human form prints around them: the filter
         /// in force, the count, and whether the run stopped at --limit rather
         /// than at the end of the store. stdout carries the document and
-        /// nothing else. Field names are documented in docs/data.md.
+        /// nothing else. Field names are documented in <https://rbx-forge.github.io/rbx-ops/data/>.
         #[arg(long)]
         json: bool,
     },
@@ -385,7 +385,7 @@ pub(crate) enum Command {
         ///
         /// Two documents, and --revision is what picks between them: without
         /// it, the revision list; with it, that revision's value. Field names
-        /// are documented in docs/data.md.
+        /// are documented in <https://rbx-forge.github.io/rbx-ops/data/>.
         #[arg(long)]
         json: bool,
     },
@@ -442,7 +442,7 @@ pub(crate) enum Command {
         /// it was applied or was a dry run, whether the entry existed, the
         /// revision it is at now, and where the backup went. stdout carries
         /// the document and nothing else. Field names are documented in
-        /// docs/data.md.
+        /// <https://rbx-forge.github.io/rbx-ops/data/>.
         ///
         /// Requires `--yes`. `OutputFormat::Json` refuses to prompt and every
         /// write here asks through `confirm_always`, so the pair would either
@@ -558,7 +558,7 @@ pub(crate) enum Command {
         /// disk, which is where the human form leaves them too. Rejected
         /// together with --open, which hands stdout to a diff tool and would
         /// write somebody else's output into the document. Field names are
-        /// documented in docs/data.md.
+        /// documented in <https://rbx-forge.github.io/rbx-ops/data/>.
         #[arg(long, conflicts_with = "open")]
         json: bool,
     },
@@ -628,7 +628,7 @@ pub(crate) enum Command {
         /// it was applied or was a dry run, whether the entry existed, the
         /// revision it is at now, and where the backup went. stdout carries
         /// the document and nothing else. Field names are documented in
-        /// docs/data.md.
+        /// <https://rbx-forge.github.io/rbx-ops/data/>.
         ///
         /// Requires `--yes`. `OutputFormat::Json` refuses to prompt and every
         /// write here asks through `confirm_always`, so the pair would either

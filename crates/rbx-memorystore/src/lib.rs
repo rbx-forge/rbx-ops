@@ -102,7 +102,7 @@ enum Command {
         /// form prints on stderr. A missing item stays an error rather than
         /// becoming a document: a script reading a key that was supposed to be
         /// there should stop. Field names are documented in
-        /// docs/memorystore.md.
+        /// <https://rbx-forge.github.io/rbx-ops/memorystore/>.
         #[arg(long)]
         json: bool,
     },
@@ -175,7 +175,7 @@ enum Command {
         /// Ids, sort keys and expiries, plus the values when --values asks for
         /// them: the same flag decides that in both formats. stdout carries
         /// the document and nothing else. Field names are documented in
-        /// docs/memorystore.md.
+        /// <https://rbx-forge.github.io/rbx-ops/memorystore/>.
         #[arg(long)]
         json: bool,
     },

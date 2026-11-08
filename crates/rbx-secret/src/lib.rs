@@ -114,7 +114,7 @@ enum Command {
 
         /// Write the listing to stdout as one JSON document.
         ///
-        /// Field names are documented in docs/secret.md. No document this
+        /// Field names are documented in <https://rbx-forge.github.io/rbx-ops/secret/>. No document this
         /// command emits has a field for secret content.
         #[arg(long)]
         json: bool,
