@@ -18,8 +18,11 @@ Operate a live Roblox experience from the command line: what its servers are doi
 
 ## Install
 
+With [mise](https://mise.jdx.dev) or [Rokit](https://github.com/rojo-rbx/rokit), either of which pins the latest release in your project's config:
+
 ```bash
-rokit add rbx-forge/rbx-ops
+mise use --pin github:rbx-forge/rbx-ops
+rokit add rbx-forge/rbx-ops   # or, with Rokit
 ```
 
 Or take a binary for your platform from the [releases page](https://github.com/rbx-forge/rbx-ops/releases), which ships a `SHA256SUMS` alongside the archives, or build from source:
