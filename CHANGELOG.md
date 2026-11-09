@@ -6,6 +6,10 @@
 
 - Release archives carry a build provenance attestation: `gh attestation verify <zip> --repo rbx-forge/rbx-ops`. The build jobs run with read access only, and the publishing job alone may write.
 
+### Fixed
+
+- `servers versions`, `list` and `logs` take `--universe-id` with `--place-id`, like every other command, and no longer refuse everything but `--env`.
+
 ## [0.1.0] - 2026-11-08
 
 First release as a standalone tool.
