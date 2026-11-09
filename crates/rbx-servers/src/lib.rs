@@ -9,7 +9,7 @@ pub mod api;
 pub mod json;
 pub mod model;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
 use colored::Colorize;
 
@@ -203,16 +203,11 @@ pub async fn walk_servers(
 }
 
 pub async fn run(cli: ServersCli, global: &GlobalFlags) -> Result<()> {
-    let Some(env) = global.env.as_deref() else {
-        bail!("`rbx-ops servers` needs an env. Pass --env <name>.");
-    };
-    if env == "all" {
-        bail!("`--env all` is not supported here: each env is a different experience with its own place versions. Name one env.");
-    }
-
-    let (universe_id, place_id) = global
-        .resolve_place(env)
-        .with_context(|| format!("resolving env `{env}`"))?;
+    // From `--universe-id` and `--place-id`, or from one env. `all` and a
+    // group are refused by the shared resolvers: each env is a different
+    // experience with its own place versions.
+    let universe_id = global.single_universe()?;
+    let place_id = global.single_place()?;
     let api_key = require_api_key(global.api_key.as_deref())?;
     let base = match &cli.base_url {
         Some(url) => ApiBase::new(url.clone()),
