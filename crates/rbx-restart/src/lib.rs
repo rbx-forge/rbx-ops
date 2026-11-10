@@ -18,7 +18,8 @@ use colored::Colorize;
 use reqwest::Client;
 
 use rbx_core::api::{
-    build_client, execute_json, execute_with_retry, explain_missing_scope, require_api_key, ApiBase,
+    api_status, build_client, execute_create_with_retry_policy, execute_json,
+    explain_missing_scope, require_api_key, ApiBase, RetryPolicy,
 };
 use rbx_core::confirm::confirm_always;
 use rbx_core::GlobalFlags;
@@ -27,6 +28,27 @@ use crate::model::{
     attributes_from_pairs, validate_attributes, validate_bleed_off, Forecast, RestartLaunched,
     RestartRequest, RestartStatuses,
 };
+
+/// Say that a write which failed without a clear refusal may still have
+/// landed.
+///
+/// A 5xx or a timeout is Roblox not answering, which is not Roblox refusing:
+/// the request may have been applied before the answer was lost. So it is not
+/// sent again, and the reader has to be told not to send it again either,
+/// before checking. `advice` says how.
+fn unconfirmed(error: anyhow::Error, advice: &str) -> anyhow::Error {
+    let no_answer = api_status(&error).is_some_and(|status| status.is_server_error())
+        || error.chain().any(|cause| {
+            cause
+                .downcast_ref::<reqwest::Error>()
+                .is_some_and(reqwest::Error::is_timeout)
+        });
+    if no_answer {
+        error.context(advice.to_string())
+    } else {
+        error
+    }
+}
 
 /// Roblox's own default is unstated, so one is chosen here rather than left to
 /// chance. Thirty minutes empties most servers on a fast-cycling experience
@@ -148,16 +170,29 @@ impl Api {
             "/server-management/v1/universes/{}/restarts",
             self.universe_id
         ));
-        let response = execute_with_retry(|| {
-            let request = self
-                .client
-                .post(&url)
-                .header("x-api-key", &self.api_key)
-                .json(body);
-            async move { request.send().await.map_err(Into::into) }
-        })
+        // Resent on a 429 only. A 5xx or a timeout does not say whether the
+        // restart was launched, and launching it again would close servers a
+        // second time.
+        let response = execute_create_with_retry_policy(
+            || {
+                let request = self
+                    .client
+                    .post(&url)
+                    .header("x-api-key", &self.api_key)
+                    .json(body);
+                async move { request.send().await.map_err(Into::into) }
+            },
+            &RetryPolicy::default(),
+        )
         .await
-        .map_err(explain_missing_scope)?;
+        .map_err(explain_missing_scope)
+        .map_err(|error| {
+            unconfirmed(
+                error,
+                "Roblox did not confirm the restart, and it may have been launched. Check \
+                 `rbx-ops restart status` before running this again.",
+            )
+        })?;
 
         let text = response.text().await?;
         serde_json::from_str(&text).with_context(|| format!("parsing the restart response: {text}"))

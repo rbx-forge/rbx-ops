@@ -147,9 +147,9 @@ Leaderboards: integer values, sorted by Roblox, no revisions and no backups.
 rbx-ops data ordered list --datastore Highscores --env prod
 rbx-ops data ordered list --datastore Highscores --limit 100 --asc --min 1000 --max 5000
 rbx-ops data ordered get Player_156 --datastore Highscores
-rbx-ops data ordered set Player_156 4200 --datastore Highscores
-rbx-ops data ordered increment Player_156 -50 --datastore Highscores
-rbx-ops data ordered delete Player_156 --datastore Highscores
+rbx-ops data ordered set Player_156 4200 --datastore Highscores --apply
+rbx-ops data ordered increment Player_156 -50 --datastore Highscores --apply
+rbx-ops data ordered delete Player_156 --datastore Highscores --apply
 ```
 
 | Verb | Does |
@@ -160,7 +160,9 @@ rbx-ops data ordered delete Player_156 --datastore Highscores
 | `increment <entry> <n>` | Atomic add; negative subtracts. Prefer it whenever two writers touch a key |
 | `delete <entry>` | Remove |
 
-The writes ask first, showing the current value; `--yes` skips. Scopes: `universe.ordered-data-store.scope.entry:read` to read, `:write` to write.
+The writes are dry runs until `--apply`, then ask; `--yes` skips the question. `set` and `delete` show the current value. `increment` does not read it: a decision made on a number that has already moved is the lost update the atomic add exists to avoid. Scopes: `universe.ordered-data-store.scope.entry:read` to read, `:write` to write.
+
+An `increment` Roblox does not confirm (a 5xx, a timeout) is not sent again, here or on a standard store: it may have been applied, and a second one would add the amount twice. The error says so; read the entry before running it again.
 
 ## `--json`
 

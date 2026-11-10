@@ -27,3 +27,5 @@ The body must be 1 to 1114 bytes (Roblox says 1 KB; 1114 is the measured limit),
 
 !!! warning "Success means accepted, not received"
     Roblox reports no delivery. An experience with no servers accepts a message exactly like a busy one. If you need confirmation, have servers write back, to a memory store for instance.
+
+A message Roblox does not confirm (a 5xx, a timeout) is not sent again: it may have been published, and a second one would reach every listening server twice. The error says so. Make the handler safe to run twice if the sender may retry by hand.

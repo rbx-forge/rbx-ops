@@ -13,11 +13,32 @@ use anyhow::{Context, Result};
 use reqwest::{Client, StatusCode};
 
 use rbx_core::api::{
-    encode_query_value, execute_json, execute_with_retry, explain_missing_scope, is_api_status,
-    ApiBase,
+    api_status, encode_query_value, execute_create_with_retry_policy, execute_json,
+    execute_with_retry, explain_missing_scope, is_api_status, ApiBase, RetryPolicy,
 };
 
 use crate::model::{DataStoreEntry, EntryList, EntryUpdate, SnapshotResult, StoreList};
+
+/// Say that a write which failed without a clear refusal may still have
+/// landed.
+///
+/// A 5xx or a timeout is Roblox not answering, which is not Roblox refusing:
+/// the request may have been applied before the answer was lost. A write that
+/// is not idempotent is therefore not sent again, and the reader has to be
+/// told not to send it again either, before checking. `advice` says how.
+pub(crate) fn unconfirmed(error: anyhow::Error, advice: &str) -> anyhow::Error {
+    let no_answer = api_status(&error).is_some_and(|status| status.is_server_error())
+        || error.chain().any(|cause| {
+            cause
+                .downcast_ref::<reqwest::Error>()
+                .is_some_and(reqwest::Error::is_timeout)
+        });
+    if no_answer {
+        error.context(advice.to_string())
+    } else {
+        error
+    }
+}
 /// Everything one request needs, resolved once per run.
 ///
 /// The fields are `pub(crate)` because the dispatch builds this, once per env,
@@ -218,16 +239,29 @@ impl Api {
     /// be lost with `set`.
     pub(crate) async fn increment(&self, entry: &str, by: i64) -> Result<DataStoreEntry> {
         let url = format!("{}:increment", self.entry_url(entry));
-        let response = execute_with_retry(|| {
-            let request = self
-                .client
-                .post(&url)
-                .header("x-api-key", &self.api_key)
-                .json(&serde_json::json!({ "amount": by }));
-            async move { request.send().await.map_err(Into::into) }
-        })
+        // Resent on a 429 only. An increment is not idempotent, and a 5xx or
+        // a timeout does not say whether Roblox applied it: sending it again
+        // would add the amount twice.
+        let response = execute_create_with_retry_policy(
+            || {
+                let request = self
+                    .client
+                    .post(&url)
+                    .header("x-api-key", &self.api_key)
+                    .json(&serde_json::json!({ "amount": by }));
+                async move { request.send().await.map_err(Into::into) }
+            },
+            &RetryPolicy::default(),
+        )
         .await
-        .map_err(explain_missing_scope)?;
+        .map_err(explain_missing_scope)
+        .map_err(|error| {
+            unconfirmed(
+                error,
+                "Roblox did not confirm the increment, and it may have been applied. Read the \
+                 entry before running this again.",
+            )
+        })?;
         let text = response.text().await?;
         serde_json::from_str(&text)
             .with_context(|| format!("parsing the incremented entry: {text}"))

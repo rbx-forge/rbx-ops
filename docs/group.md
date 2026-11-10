@@ -8,7 +8,7 @@ rbx-ops group members Moderator
 rbx-ops group rank builderman Moderator --apply
 ```
 
-**Which group:** `--group <id>`, or else `[owner]` in `rbxplace.toml` (an env's `[<env>.owner]` with `--env`). An owner that is a user is refused.
+**Which group:** `--group <id>`, or else `[owner]` in `rbxplace.toml` (an env's `[<env>.owner]` with `--env`). An owner that is a user is refused. So is an `--env` the file does not have, `all`, or a group of envs: none of them falls back to the top-level owner.
 
 | Subcommand | Scope |
 | --- | --- |

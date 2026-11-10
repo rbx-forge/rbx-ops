@@ -23,6 +23,8 @@ Servers already on the newest version are left alone, so "hit" can be far below 
 
 Without `--apply`, shows the forecast and stops. With it, asks, then schedules. If every server is already current, nothing is asked.
 
+A launch Roblox does not confirm (a 5xx, a timeout) is not sent again: it may have been scheduled. The error says so; look at `rbx-ops restart status` before launching another.
+
 | Flag | Meaning |
 | --- | --- |
 | `--bleed-off <minutes>` | Time before servers start closing, 1 to 240 (default 30). Players are not matched to those servers meanwhile, so most leave on their own |
