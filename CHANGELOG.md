@@ -2,9 +2,14 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
+### Changed
+
+- **`data ordered set`, `increment` and `delete` are dry runs until `--apply`**, like every other write. They wrote as soon as the question was answered, and `--yes` alone wrote at once. A script that calls one of them now needs `--apply`.
+
 ### Fixed
 
-- `data ordered set`, `increment` and `delete` are dry runs until `--apply`, like every other write. They wrote as soon as the question was answered, and `--yes` alone wrote at once.
 - `group rank` and `unrank` refuse an `--env` that `rbxplace.toml` does not have, `all`, and a group of envs. Each fell back to the top-level `[owner]`, so a typo acted on another group than the one meant.
 - A write that is not idempotent is no longer sent again after a 5xx or a timeout: `data increment`, `data ordered increment`, `restart launch` and `message`. Roblox may have applied it before the answer was lost, and a second one added the amount, launched the restart or delivered the message twice. The error says the request may have landed and how to check. A 429 is still retried: it is a refusal before anything happened.
 
