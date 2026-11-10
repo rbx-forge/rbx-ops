@@ -450,3 +450,30 @@ async fn a_launch_roblox_did_not_confirm_is_not_sent_again() {
         .count();
     assert_eq!(posts, 1, "the launch must go out once");
 }
+
+/// Roblox answers 2xx and the body does not parse: the restart is launched,
+/// and the error has to say so before somebody launches another.
+#[tokio::test]
+async fn a_launch_whose_answer_cannot_be_read_says_it_is_launched() {
+    let dir = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    mount_forecast(&server, 42, 7).await;
+    Mock::given(method("POST"))
+        .and(path(format!(
+            "/server-management/v1/universes/{UNIVERSE}/restarts"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
+        .mount(&server)
+        .await;
+
+    let error = run(
+        cli(&["launch", "--apply", "--yes"], &server),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .unwrap_err();
+
+    let text = format!("{error:#}");
+    assert!(text.contains("Roblox launched the restart"), "{text}");
+    assert!(text.contains("restart status"), "{text}");
+}

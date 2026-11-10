@@ -33,7 +33,7 @@ use serde::Deserialize;
 
 use rbx_core::api::{
     build_client, encode_query_value, execute_create_with_retry_policy, execute_json,
-    execute_with_retry, explain_missing_scope, is_api_status, ApiBase, RetryPolicy,
+    execute_with_retry, explain_missing_scope, is_api_status, unconfirmed, ApiBase, RetryPolicy,
 };
 use rbx_core::confirm::confirm_always;
 use rbx_core::output::{self, OutputFormat};
@@ -398,15 +398,18 @@ impl Api {
         .await
         .map_err(explain_missing_scope)
         .map_err(|error| {
-            crate::api::unconfirmed(
+            unconfirmed(
                 error,
                 "Roblox did not confirm the increment, and it may have been applied. Read the \
                  entry before running this again.",
             )
         })?;
-        let text = response.text().await?;
+        let text = response
+            .text()
+            .await
+            .context(crate::api::INCREMENT_APPLIED)?;
         serde_json::from_str(&text)
-            .with_context(|| format!("parsing the incremented entry: {text}"))
+            .with_context(|| format!("{} It answered: {text}", crate::api::INCREMENT_APPLIED))
     }
 
     async fn delete(&self, entry: &str) -> Result<()> {
