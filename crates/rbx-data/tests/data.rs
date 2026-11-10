@@ -1188,3 +1188,44 @@ fn json_requires_yes_only_where_there_is_something_to_confirm() {
     assert!(parse(&["delete-store", "PlayerData", "--json", "--yes"]).is_ok());
     assert!(parse(&["restore-store", "PlayerData", "--json"]).is_ok());
 }
+
+/// A 503 is Roblox not answering, which is not Roblox refusing: the increment
+/// may have been applied before the answer was lost. Sent again, it would
+/// grant the currency twice, so it goes out once and the error says to read
+/// the entry first.
+#[tokio::test]
+async fn an_increment_roblox_did_not_confirm_is_not_sent_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    mount_existing(
+        &server,
+        serde_json::json!({ "value": 500, "revisionId": "r1" }),
+    )
+    .await;
+    Mock::given(method("POST"))
+        .and(path(format!("{ENTRY_PATH}:increment")))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+
+    let error = run(
+        cli(
+            &["increment", "Player_156", "--by", "50", "--apply", "--yes"],
+            &server,
+        ),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .unwrap_err();
+
+    let text = format!("{error:#}");
+    assert!(text.contains("may have been applied"), "{text}");
+    let posts = server
+        .received_requests()
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|r| r.method == wiremock::http::Method::POST)
+        .count();
+    assert_eq!(posts, 1, "the increment must go out once");
+}

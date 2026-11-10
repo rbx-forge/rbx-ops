@@ -37,7 +37,8 @@ use reqwest::Client;
 use serde::Serialize;
 
 use rbx_core::api::{
-    build_client, execute_with_retry, explain_missing_scope, require_api_key, ApiBase,
+    api_status, build_client, execute_create_with_retry_policy, explain_missing_scope,
+    require_api_key, ApiBase, RetryPolicy,
 };
 use rbx_core::output::{self, OutputFormat};
 use rbx_core::GlobalFlags;
@@ -45,6 +46,26 @@ use rbx_core::GlobalFlags;
 pub mod json;
 
 use json::PublishDocument;
+
+/// Say that a write which failed without a clear refusal may still have
+/// landed.
+///
+/// A 5xx or a timeout is Roblox not answering, which is not Roblox refusing:
+/// the request may have been applied before the answer was lost. So it is not
+/// sent again, and the reader has to be told what sending it again would do.
+fn unconfirmed(error: anyhow::Error, advice: &str) -> anyhow::Error {
+    let no_answer = api_status(&error).is_some_and(|status| status.is_server_error())
+        || error.chain().any(|cause| {
+            cause
+                .downcast_ref::<reqwest::Error>()
+                .is_some_and(reqwest::Error::is_timeout)
+        });
+    if no_answer {
+        error.context(advice.to_string())
+    } else {
+        error
+    }
+}
 
 /// Roblox's actual ceiling for one message, and its floor.
 ///
@@ -172,12 +193,25 @@ pub async fn run(cli: MessageCli, global: &GlobalFlags) -> Result<()> {
         message: &message,
     };
 
-    let response = execute_with_retry(|| {
-        let request = client.post(&url).header("x-api-key", &api_key).json(&body);
-        async move { request.send().await.map_err(Into::into) }
-    })
+    // Resent on a 429 only. A 5xx or a timeout does not say whether the
+    // message was published, and publishing it again delivers it twice to
+    // every server that is listening.
+    let response = execute_create_with_retry_policy(
+        || {
+            let request = client.post(&url).header("x-api-key", &api_key).json(&body);
+            async move { request.send().await.map_err(Into::into) }
+        },
+        &RetryPolicy::default(),
+    )
     .await
-    .map_err(explain_missing_scope)?;
+    .map_err(explain_missing_scope)
+    .map_err(|error| {
+        unconfirmed(
+            error,
+            "Roblox did not confirm the message, and it may have been published. Nothing reads \
+             a message back: sending it again may deliver it twice.",
+        )
+    })?;
 
     let status = response.status();
     if !status.is_success() {
