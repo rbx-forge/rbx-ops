@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-10
+
+### Fixed
+
+- `data increment`, `data ordered increment`, `restart launch` and `message` are sent again after a failure to connect, which sent nothing. They are still not sent again once the request has left.
+- A wait before a retry says what Roblox answered: a rate limit after a 429, the status after a 5xx. Every wait read "Rate limited by Roblox".
+
 ## [0.2.0] - 2026-11-10
 
 ### Changed
