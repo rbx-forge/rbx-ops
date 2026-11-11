@@ -741,6 +741,19 @@ async fn resolve(
     name: Option<String>,
     verb: &str,
 ) -> Result<Vec<model::Campaign>> {
+    // Every name starts with the empty string, so `--name ""` would select the
+    // whole account: one `cancel` away from ending every campaign for good.
+    // Refused before the listing, so nothing is even read.
+    if name
+        .as_deref()
+        .is_some_and(|prefix| prefix.trim().is_empty())
+    {
+        bail!(
+            "--name is empty, which would match every campaign. Name the group, \
+             or pass a campaign id to {verb} just one. Nothing sent"
+        );
+    }
+
     if let Some(id) = id {
         let campaign = api::get_campaign(client, base, api_key, &id).await?;
         refuse_if_completed(&campaign)?;

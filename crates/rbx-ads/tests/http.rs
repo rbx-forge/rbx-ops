@@ -582,6 +582,33 @@ async fn a_name_matching_only_completed_campaigns_sends_nothing_and_says_why() {
     assert!(writes(&requests).is_empty());
 }
 
+/// Every name starts with the empty string, so an empty `--name` would select
+/// every campaign on the account. It is refused before anything is read.
+#[tokio::test]
+async fn an_empty_name_is_refused_before_any_request() {
+    for verb in ["cancel", "pause", "resume"] {
+        for empty in ["", "   ", "\t"] {
+            let server = MockServer::start().await;
+            let dir = tempfile::tempdir().unwrap();
+            let places = places_file(dir.path());
+            mount_campaigns(&server, serde_json::json!([listed("live", "Push B", &[])])).await;
+
+            let err = run(
+                cli(&[verb, "--name", empty, "--apply", "--yes"], &server),
+                &flags(&places),
+            )
+            .await
+            .expect_err(&format!("{verb} --name {empty:?} should be refused"));
+
+            assert!(err.to_string().contains("--name"), "{err}");
+            assert!(
+                server.received_requests().await.unwrap().is_empty(),
+                "{verb} --name {empty:?} must fail before any request"
+            );
+        }
+    }
+}
+
 /// Named by id it is not a selection, so being told no is the answer.
 #[tokio::test]
 async fn a_completed_campaign_named_by_id_is_refused_before_any_write() {
