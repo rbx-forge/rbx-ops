@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`memorystore set --ttl` sends the durations its help shows as seconds.** `10m` and `2h` went out as written, a form the API does not read; they are now sent as `600s` and `7200s`. A TTL that cannot be read is refused before any request.
+
 ## [0.2.2] - 2026-11-11
 
 ### Security

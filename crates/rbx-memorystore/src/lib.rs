@@ -59,6 +59,46 @@ use crate::model::{ItemList, ItemWrite, SortedMapItem};
 /// Roblox caps a page at 100 items.
 const MAX_PAGE_SIZE: u32 = 100;
 
+/// Read `--ttl` (`300s`, `10m`, `2h`, `1d`, `1w`, or a bare number of seconds)
+/// into the `"600s"` the API takes.
+///
+/// The body field is a protobuf duration, which is seconds with an `s` suffix
+/// and nothing else: `10m` sent as written is refused. So the conversion
+/// happens here, and anything it cannot read stops the command before a
+/// request rather than turning into a 400 that does not say which flag.
+fn parse_ttl(input: &str) -> Result<String> {
+    let trimmed = input.trim().to_ascii_lowercase();
+    let hint = || format!("`{input}` is not a TTL. Try 300s, 10m, 2h or 1d.");
+
+    let (number, unit) = match trimmed.chars().last() {
+        None => bail!("--ttl is empty. Try 300s, 10m, 2h or 1d."),
+        Some(last) if last.is_ascii_digit() => (trimmed.as_str(), 's'),
+        Some(last) => (&trimmed[..trimmed.len() - last.len_utf8()], last),
+    };
+    let scale: u64 = match unit {
+        's' => 1,
+        'm' => 60,
+        'h' => 3_600,
+        'd' => 86_400,
+        'w' => 604_800,
+        _ => bail!("{} Units are s, m, h, d and w.", hint()),
+    };
+    // Digits only: `u64::from_str` would also take a leading `+`.
+    if number.is_empty() || !number.bytes().all(|b| b.is_ascii_digit()) {
+        bail!("{}", hint());
+    }
+    let amount: u64 = number.parse().map_err(|_| anyhow::anyhow!(hint()))?;
+    if amount == 0 {
+        bail!("a zero TTL expires the item as it is written; omit --ttl for one that stays.");
+    }
+    // Checked: an overflow would otherwise wrap to a short TTL in a release
+    // build, turning a typo into an item that vanishes.
+    let Some(seconds) = amount.checked_mul(scale) else {
+        bail!("`{input}` is too long to be a TTL.");
+    };
+    Ok(format!("{seconds}s"))
+}
+
 #[derive(Args, Debug)]
 pub struct MemoryStoreCli {
     #[command(subcommand)]
@@ -126,6 +166,10 @@ enum Command {
         file: Option<PathBuf>,
 
         /// How long the item lives, as a duration like `300s`, `10m` or `2h`.
+        ///
+        /// Units are `s`, `m`, `h`, `d` and `w`; a bare number is seconds. It
+        /// is sent as whole seconds (`10m` becomes `600s`), the only form the
+        /// API reads.
         ///
         /// Omit it and the item stays until something removes it. For a cache
         /// that is rarely what you want: a TTL is what stops a stale value
@@ -245,6 +289,11 @@ pub async fn run(cli: MemoryStoreCli, global: &GlobalFlags) -> Result<()> {
             string_sort_key,
             apply,
         } => {
+            // Before anything else, the dry run included: a TTL that cannot be
+            // read is a mistake in the command line, not something to find out
+            // from a 400 after the value was already read and parsed.
+            let ttl = ttl.as_deref().map(parse_ttl).transpose()?;
+
             let raw = match (value, file) {
                 (Some(inline), _) => inline,
                 (None, Some(path)) => std::fs::read_to_string(&path)
