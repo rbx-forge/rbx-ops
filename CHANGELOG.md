@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-11
+
 ### Security
 
 - **The API key no longer follows a redirect to another host.** Every command stops at a redirect that leaves the host it called and reports it with its status. A request redirected elsewhere used to go there with its `x-api-key` header.
