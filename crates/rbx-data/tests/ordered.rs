@@ -485,3 +485,31 @@ async fn an_increment_roblox_did_not_confirm_is_not_sent_again() {
     assert!(error.contains("may have been applied"), "{error}");
     assert_eq!(requests.len(), 1, "the increment must go out once");
 }
+
+/// A 302 to the same host turns the POST into a GET of wherever it points,
+/// and the 404 from there says nothing about the increment: it may have been
+/// applied, and the error says to read the entry instead of reading as a
+/// refusal.
+#[tokio::test]
+async fn an_increment_answered_after_a_redirect_may_have_been_applied() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(format!("{ENTRIES}/Player_1:increment")))
+        .respond_with(ResponseTemplate::new(302).insert_header("location", "/moved"))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/moved"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    let (result, _) = exec(
+        &["increment", "Player_1", "50", "--apply", "--yes"],
+        &server,
+    )
+    .await;
+
+    let error = format!("{:#}", result.unwrap_err());
+    assert!(error.contains("may have been applied"), "{error}");
+}
