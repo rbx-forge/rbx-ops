@@ -7,6 +7,7 @@
 - **`memorystore set --ttl` sends the durations its help shows as seconds.** `10m` and `2h` went out as written, a form the API does not read; they are now sent as `600s` and `7200s`. A TTL that cannot be read is refused before any request.
 - **A data write that does not land keeps every older backup.** `data set`, `reset`, `restore`, `copy` and `delete-key` applied `--keep` as they wrote the backup, before the confirmation, so answering no or a refused request still deleted the oldest backups of the entry. They are pruned once the write has landed.
 - **`ads cancel`, `pause` and `resume` refuse an empty `--name`.** Every campaign name starts with the empty string, so `--name ""` selected every campaign on the account. It is refused before any request.
+- **The quick start's `servers` commands pass `--place-id`.** Servers belong to a place, and with `--universe-id` alone both stopped at "no target".
 
 ## [0.2.2] - 2026-11-11
 

@@ -25,11 +25,11 @@ export RBX_API_KEY="..."
 ## 3. Look at your servers
 
 ```sh
-rbx-ops servers versions --universe-id 9876543210
-rbx-ops servers list --universe-id 9876543210
+rbx-ops servers versions --universe-id 9876543210 --place-id 1234567890
+rbx-ops servers list --universe-id 9876543210 --place-id 1234567890
 ```
 
-With an `rbxplace.toml` in the project, `--env prod` replaces the id: see [Configuration](reference/configuration.md).
+Servers belong to a place, so both ids are needed. With an `rbxplace.toml` in the project, `--env prod` replaces them: see [Configuration](reference/configuration.md).
 
 ## 4. Before writing anything
 
