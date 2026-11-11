@@ -1633,7 +1633,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-ads"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1650,7 +1650,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-analytics"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1667,7 +1667,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-ban"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1703,7 +1703,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-data"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1720,7 +1720,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-group"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1736,7 +1736,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-memorystore"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1752,7 +1752,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-message"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1768,7 +1768,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-ops"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1793,7 +1793,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-restart"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-secret"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1827,7 +1827,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-servers"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1842,7 +1842,7 @@ dependencies = [
 
 [[package]]
 name = "rbx-user"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
