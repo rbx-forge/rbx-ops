@@ -55,8 +55,11 @@ confidence-threshold = 0.8
 # and failing CI on something only a fork could fix trains everyone to ignore
 # the job.
 multiple-versions = "warn"
-# No `*` version requirement on a third-party crate. The workspace's own
-# crates depend on each other by path, which is not what this is for.
+# No `*` version requirement on a crates.io dependency. A path or git
+# dependency has no version requirement at all, which cargo-deny counts as a
+# wildcard: here, the workspace's own crates depending on each other, and
+# rbx-core, pinned by tag. `allow-wildcard-paths` lets those through because
+# every crate in the workspace is `publish = false`.
 wildcards = "deny"
 allow-wildcard-paths = true
 deny = []
