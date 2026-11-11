@@ -107,55 +107,60 @@ fn default_dir(places: &Path, env: &str) -> PathBuf {
         .join(sanitise_filename(env))
 }
 
-/// What a backup left behind, for the caller to report.
-#[derive(Debug)]
-pub struct Written {
-    pub path: PathBuf,
-    /// Older backups of the same entry removed by retention.
-    pub pruned: usize,
-}
-
-/// Write `contents` as the backup of `entry`, and prune under retention.
+/// Write `contents` as the backup of `entry`, and return where it went.
+///
+/// Nothing is pruned here: that is [`retain`], once the write to Roblox has
+/// landed. The copy is written before the confirmation prompt, and a prompt
+/// answered no (or a request that fails) must leave every older backup where
+/// it was: the operator changed nothing, so neither should the directory.
 ///
 /// [`BackupTarget::Skip`] is not handled here: the caller warns about it, and
-/// making this return `Option<Written>` would let a future caller read `None`
+/// making this return `Option<PathBuf>` would let a future caller read `None`
 /// as "nothing to say" rather than "the only way back was skipped".
-pub fn write(target: &BackupTarget, entry: &str, contents: &str) -> Result<Written> {
+pub fn write(target: &BackupTarget, entry: &str, contents: &str) -> Result<PathBuf> {
     match target {
         BackupTarget::Path(path) => {
             write_file(path, contents)?;
-            Ok(Written {
-                path: path.clone(),
-                pruned: 0,
-            })
+            Ok(path.clone())
         }
-        BackupTarget::Managed { dir, keep } => {
+        BackupTarget::Managed { dir, .. } => {
             std::fs::create_dir_all(dir)
                 .with_context(|| format!("creating the backup directory {}", dir.display()))?;
             let path = unique_path(dir, entry, &timestamp())?;
             write_file(&path, contents)?;
-            // After the write, never before: pruning to make room for a copy
-            // that then fails to land would delete a backup and keep nothing.
-            let pruned = match prune(dir, entry, *keep) {
-                Ok(removed) => removed,
-                // Non-fatal on purpose. The value about to be destroyed is
-                // already on disk; a directory that cannot be tidied is not a
-                // reason to stop the operator from writing.
-                Err(err) => {
-                    eprintln!(
-                        "{}",
-                        format!(
-                            "could not prune older backups in {}: {err:#}",
-                            dir.display()
-                        )
-                        .yellow()
-                    );
-                    0
-                }
-            };
-            Ok(Written { path, pruned })
+            Ok(path)
         }
         BackupTarget::Skip => unreachable!("BackupTarget::Skip is handled by the caller"),
+    }
+}
+
+/// Apply `--keep` to `entry`'s backups, and say how many went.
+///
+/// Called only once the write it backed up has landed. Before that point the
+/// write may still be refused at the prompt or by Roblox, and pruning for a
+/// change that never happened would delete history for nothing.
+///
+/// Only the managed directory is pruned: `--backup <path>` names one file and
+/// nothing near it is touched, and `--no-backup` wrote nothing.
+pub fn retain(target: &BackupTarget, entry: &str) -> usize {
+    let BackupTarget::Managed { dir, keep } = target else {
+        return 0;
+    };
+    match prune(dir, entry, *keep) {
+        Ok(removed) => removed,
+        // Non-fatal on purpose. The write already landed and its backup is on
+        // disk; a directory that cannot be tidied does not undo either.
+        Err(err) => {
+            eprintln!(
+                "{}",
+                format!(
+                    "could not prune older backups in {}: {err:#}",
+                    dir.display()
+                )
+                .yellow()
+            );
+            0
+        }
     }
 }
 
@@ -376,10 +381,10 @@ mod tests {
         assert_eq!(names(dir.path()).len(), 1);
     }
 
-    /// The whole point of the managed directory: it creates itself, names by
-    /// time, and reports what it removed.
+    /// The whole point of the managed directory: it creates itself and names
+    /// by time. Writing prunes nothing; `retain` does, and reports it.
     #[test]
-    fn a_managed_write_creates_the_directory_and_prunes() {
+    fn a_managed_write_creates_the_directory_and_retain_prunes() {
         let root = tempfile::tempdir().unwrap();
         let dir = root.path().join(".rbx/backups/prod");
         let target = BackupTarget::Managed {
@@ -391,12 +396,20 @@ mod tests {
 
         let written = write(&target, "Player_156", "{\"coins\":1}").unwrap();
 
-        assert!(written.path.starts_with(&dir));
-        assert_eq!(written.pruned, 1);
+        assert!(written.starts_with(&dir));
         assert_eq!(
-            std::fs::read_to_string(&written.path).unwrap(),
+            std::fs::read_to_string(&written).unwrap(),
             "{\"coins\":1}\n"
         );
+        assert_eq!(
+            names(&dir).len(),
+            2,
+            "writing the backup must not prune: the write it protects has not landed yet"
+        );
+
+        assert_eq!(retain(&target, "Player_156"), 1);
+        assert_eq!(names(&dir).len(), 1);
+        assert!(written.exists(), "retain keeps the newest copy");
     }
 
     fn touch_dir(dir: &Path) {
@@ -411,10 +424,11 @@ mod tests {
         touch(dir.path(), "Player_156-20260101T000000Z.json");
         let path = dir.path().join("before.json");
 
-        let written = write(&BackupTarget::Path(path.clone()), "Player_156", "{}").unwrap();
+        let target = BackupTarget::Path(path.clone());
+        let written = write(&target, "Player_156", "{}").unwrap();
 
-        assert_eq!(written.path, path);
-        assert_eq!(written.pruned, 0);
+        assert_eq!(written, path);
+        assert_eq!(retain(&target, "Player_156"), 0);
         assert_eq!(names(dir.path()).len(), 2);
     }
 }

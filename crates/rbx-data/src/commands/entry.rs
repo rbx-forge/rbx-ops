@@ -333,17 +333,8 @@ pub(crate) async fn run(ctx: &Ctx<'_>, command: Command) -> Result<()> {
                 BackupTarget::Path(_) | BackupTarget::Managed { .. } => {
                     let written =
                         backup::write(&target, &entry, &serde_json::to_string_pretty(&current)?)?;
-                    document.backup = Some(written.path.display().to_string());
-                    format.note(format!("backup written to {}", written.path.display()));
-                    if written.pruned > 0 {
-                        format.note(
-                            format!(
-                                "  {} older backup(s) of {entry} removed by --keep",
-                                written.pruned
-                            )
-                            .dimmed(),
-                        );
-                    }
+                    document.backup = Some(written.display().to_string());
+                    format.note(format!("backup written to {}", written.display()));
                 }
                 // Unlike an overwrite, a delete leaves the value readable for
                 // thirty days, so skipping the copy is not the same cliff. It
@@ -370,6 +361,9 @@ pub(crate) async fn run(ctx: &Ctx<'_>, command: Command) -> Result<()> {
                  for thirty days.",
                 "done".green().bold()
             ));
+            // After the delete landed, as for an overwrite: a no at the prompt
+            // or a refused request leaves every older backup in place.
+            note_pruned(format, &entry, backup::retain(&target, &entry));
 
             if format.is_json() {
                 return output::emit(&document);

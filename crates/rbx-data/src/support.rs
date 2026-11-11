@@ -160,17 +160,8 @@ pub(crate) async fn write_entry(
                 &found.value.clone().unwrap_or(serde_json::Value::Null),
             )?;
             let written = backup::write(&backup, entry, &contents)?;
-            document.backup = Some(written.path.display().to_string());
-            format.note(format!("backup written to {}", written.path.display()));
-            if written.pruned > 0 {
-                format.note(
-                    format!(
-                        "  {} older backup(s) of {entry} removed by --keep",
-                        written.pruned
-                    )
-                    .dimmed(),
-                );
-            }
+            document.backup = Some(written.display().to_string());
+            format.note(format!("backup written to {}", written.display()));
         }
         // Said out loud every time. The prompt below is the last chance to
         // stop, and it should not be the first place you learn that the value
@@ -203,11 +194,24 @@ pub(crate) async fn write_entry(
         written.revision_id.as_deref().unwrap_or("(unknown)")
     ));
 
+    // Only now, with the write landed: a no at the prompt or a refused
+    // request returns above, and leaves every older backup where it was.
+    if existing.is_some() {
+        note_pruned(format, entry, backup::retain(&backup, entry));
+    }
+
     if format.is_json() {
         return output::emit(&document);
     }
 
     Ok(())
+}
+
+/// Say what `--keep` removed, if anything.
+pub(crate) fn note_pruned(format: OutputFormat, entry: &str, pruned: usize) {
+    if pruned > 0 {
+        format.note(format!("  {pruned} older backup(s) of {entry} removed by --keep").dimmed());
+    }
 }
 
 pub(crate) fn indent(text: &str) -> String {
