@@ -412,3 +412,36 @@ async fn a_publish_roblox_did_not_confirm_is_not_sent_again() {
         "the message must go out once"
     );
 }
+
+/// A 302 to the same host turns the POST into a GET of wherever it points,
+/// and the 404 from there says nothing about the publish: the message may
+/// have been published, and the error says so instead of reading as a
+/// refusal.
+#[tokio::test]
+async fn a_publish_answered_after_a_redirect_may_have_been_published() {
+    let dir = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(PUBLISH_PATH))
+        .respond_with(ResponseTemplate::new(302).insert_header("location", "/moved"))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/moved"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    let error = run(
+        cli(
+            &["--topic", "cache", "--message", "reload", "--apply"],
+            &server,
+        ),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .unwrap_err();
+
+    let text = format!("{error:#}");
+    assert!(text.contains("may have been published"), "{text}");
+}

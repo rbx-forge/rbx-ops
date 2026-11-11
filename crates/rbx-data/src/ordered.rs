@@ -384,14 +384,11 @@ impl Api {
         // a timeout does not say whether Roblox applied it: sending it again
         // would add the amount twice.
         let response = execute_create_with_retry_policy(
-            || async {
-                Ok(self
-                    .client
+            || {
+                self.client
                     .post(&url)
                     .header("x-api-key", &self.api_key)
                     .json(&serde_json::json!({ "amount": amount }))
-                    .send()
-                    .await?)
             },
             &RetryPolicy::default(),
         )

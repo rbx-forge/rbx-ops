@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Security
+
+- **The API key no longer follows a redirect to another host.** Every command stops at a redirect that leaves the host it called and reports it with its status. A request redirected elsewhere used to go there with its `x-api-key` header.
+
+### Fixed
+
+- **A write answered after a redirect says it may have landed.** `data increment`, `data ordered increment`, `restart launch` and `message` followed a 302 as a GET, and a 4xx from wherever it pointed read as a refusal. The error now says the write may have gone through and how to check, as after a 5xx, and so does a redirect to another host.
+
 ## [0.2.1] - 2026-11-10
 
 ### Fixed

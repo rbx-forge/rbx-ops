@@ -177,10 +177,7 @@ pub async fn run(cli: MessageCli, global: &GlobalFlags) -> Result<()> {
     // message was published, and publishing it again delivers it twice to
     // every server that is listening.
     let response = execute_create_with_retry_policy(
-        || {
-            let request = client.post(&url).header("x-api-key", &api_key).json(&body);
-            async move { request.send().await.map_err(Into::into) }
-        },
+        || client.post(&url).header("x-api-key", &api_key).json(&body),
         &RetryPolicy::default(),
     )
     .await

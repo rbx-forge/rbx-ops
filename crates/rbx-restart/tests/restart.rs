@@ -451,6 +451,72 @@ async fn a_launch_roblox_did_not_confirm_is_not_sent_again() {
     assert_eq!(posts, 1, "the launch must go out once");
 }
 
+/// A 302 to the same host turns the POST into a GET of wherever it points,
+/// and the 404 from there says nothing about the launch: the restart may
+/// have been launched, and the error says so instead of reading as a refusal.
+#[tokio::test]
+async fn a_launch_answered_after_a_redirect_may_have_been_launched() {
+    let dir = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    mount_forecast(&server, 42, 7).await;
+    Mock::given(method("POST"))
+        .and(path(format!(
+            "/server-management/v1/universes/{UNIVERSE}/restarts"
+        )))
+        .respond_with(ResponseTemplate::new(302).insert_header("location", "/moved"))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/moved"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    let error = run(
+        cli(&["launch", "--apply", "--yes"], &server),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .unwrap_err();
+
+    let text = format!("{error:#}");
+    assert!(text.contains("may have been launched"), "{text}");
+}
+
+/// A redirect to another host is not followed: the API key stays with
+/// Roblox, and the launch is reported as one that may have gone through.
+#[tokio::test]
+async fn a_launch_redirected_to_another_host_does_not_carry_the_key_there() {
+    let dir = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    let elsewhere = MockServer::start().await;
+    mount_forecast(&server, 42, 7).await;
+    Mock::given(method("POST"))
+        .and(path(format!(
+            "/server-management/v1/universes/{UNIVERSE}/restarts"
+        )))
+        .respond_with(
+            ResponseTemplate::new(307)
+                .insert_header("location", format!("{}/restarts", elsewhere.uri())),
+        )
+        .mount(&server)
+        .await;
+
+    let error = run(
+        cli(&["launch", "--apply", "--yes"], &server),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .unwrap_err();
+
+    let text = format!("{error:#}");
+    assert!(text.contains("may have been launched"), "{text}");
+    assert!(
+        elsewhere.received_requests().await.unwrap().is_empty(),
+        "the other host must receive nothing"
+    );
+}
+
 /// Roblox answers 2xx and the body does not parse: the restart is launched,
 /// and the error has to say so before somebody launches another.
 #[tokio::test]

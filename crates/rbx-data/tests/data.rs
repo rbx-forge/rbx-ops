@@ -1230,6 +1230,44 @@ async fn an_increment_roblox_did_not_confirm_is_not_sent_again() {
     assert_eq!(posts, 1, "the increment must go out once");
 }
 
+/// A 302 to the same host turns the POST into a GET of wherever it points,
+/// and the 404 from there says nothing about the increment: it may have been
+/// applied, and the error says to read the entry instead of reading as a
+/// refusal.
+#[tokio::test]
+async fn an_increment_answered_after_a_redirect_may_have_been_applied() {
+    let dir = tempfile::tempdir().unwrap();
+    let server = MockServer::start().await;
+    mount_existing(
+        &server,
+        serde_json::json!({ "value": 500, "revisionId": "r1" }),
+    )
+    .await;
+    Mock::given(method("POST"))
+        .and(path(format!("{ENTRY_PATH}:increment")))
+        .respond_with(ResponseTemplate::new(302).insert_header("location", "/moved"))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/moved"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    let error = run(
+        cli(
+            &["increment", "Player_156", "--by", "50", "--apply", "--yes"],
+            &server,
+        ),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .unwrap_err();
+
+    let text = format!("{error:#}");
+    assert!(text.contains("may have been applied"), "{text}");
+}
+
 /// The other way an applied increment looked like a failure: Roblox answers
 /// 2xx and the body does not parse. The increment is in, and the error has to
 /// say so before somebody runs it a second time.

@@ -154,12 +154,10 @@ impl Api {
         // second time.
         let response = execute_create_with_retry_policy(
             || {
-                let request = self
-                    .client
+                self.client
                     .post(&url)
                     .header("x-api-key", &self.api_key)
-                    .json(body);
-                async move { request.send().await.map_err(Into::into) }
+                    .json(body)
             },
             &RetryPolicy::default(),
         )
