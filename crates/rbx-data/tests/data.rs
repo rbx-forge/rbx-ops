@@ -332,6 +332,130 @@ async fn keep_prunes_the_oldest_backups_of_that_entry() {
     assert_eq!(std::fs::read_dir(&backups).unwrap().count(), 2);
 }
 
+/// Three older backups of the entry, in the default directory the tests use.
+fn seed_backups(dir: &std::path::Path) -> std::path::PathBuf {
+    let backups = dir.join(".rbx").join("backups").join("ops");
+    std::fs::create_dir_all(&backups).unwrap();
+    for stamp in ["20260101T000000Z", "20260102T000000Z", "20260103T000000Z"] {
+        std::fs::write(backups.join(format!("Player_156-{stamp}.json")), "{}\n").unwrap();
+    }
+    backups
+}
+
+/// The backup is written before the prompt, but `--keep` applies only once the
+/// write landed. A write that never happens (answered no, or refused by Roblox)
+/// changed nothing, so the history it would have pruned must still be there.
+#[tokio::test]
+async fn a_write_that_fails_prunes_no_older_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let backups = seed_backups(dir.path());
+    let server = MockServer::start().await;
+    mount_existing(&server, serde_json::json!({ "value": { "coins": 500 } })).await;
+    Mock::given(method("PATCH"))
+        .respond_with(ResponseTemplate::new(403).set_body_string("{}"))
+        .mount(&server)
+        .await;
+
+    run(
+        cli(
+            &[
+                "set",
+                "Player_156",
+                "--value",
+                "0",
+                "--keep",
+                "1",
+                "--apply",
+                "--yes",
+            ],
+            &server,
+        ),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .expect_err("the write was refused");
+
+    assert_eq!(
+        std::fs::read_dir(&backups).unwrap().count(),
+        4,
+        "the three older backups and the new one must all survive a write that did not land"
+    );
+}
+
+#[tokio::test]
+async fn a_delete_that_fails_prunes_no_older_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let backups = seed_backups(dir.path());
+    let server = MockServer::start().await;
+    mount_existing(&server, serde_json::json!({ "value": { "coins": 500 } })).await;
+    Mock::given(method("DELETE"))
+        .respond_with(ResponseTemplate::new(403).set_body_string("{}"))
+        .mount(&server)
+        .await;
+
+    run(
+        cli(
+            &[
+                "delete-key",
+                "Player_156",
+                "--keep",
+                "1",
+                "--apply",
+                "--yes",
+            ],
+            &server,
+        ),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .expect_err("the delete was refused");
+
+    assert_eq!(std::fs::read_dir(&backups).unwrap().count(), 4);
+}
+
+/// And once it has landed, `--keep` does apply, counting the new copy.
+#[tokio::test]
+async fn a_write_that_lands_prunes_down_to_keep() {
+    let dir = tempfile::tempdir().unwrap();
+    let backups = seed_backups(dir.path());
+    let server = MockServer::start().await;
+    mount_existing(&server, serde_json::json!({ "value": { "coins": 500 } })).await;
+    Mock::given(method("PATCH"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({})))
+        .mount(&server)
+        .await;
+
+    run(
+        cli(
+            &[
+                "set",
+                "Player_156",
+                "--value",
+                "0",
+                "--keep",
+                "1",
+                "--apply",
+                "--yes",
+            ],
+            &server,
+        ),
+        &flags(&places_file(dir.path())),
+    )
+    .await
+    .unwrap();
+
+    let left: Vec<_> = std::fs::read_dir(&backups)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(left.len(), 1, "got {left:?}");
+    let content = std::fs::read_to_string(backups.join(&left[0])).unwrap();
+    assert!(
+        content.contains("500"),
+        "the survivor must be the new copy, not a seeded one: {left:?}"
+    );
+}
+
 /// `--keep` describes the default directory; with `--backup` there is no
 /// directory to prune, and with `--no-backup` there is nothing to keep.
 #[test]
