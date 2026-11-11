@@ -84,7 +84,7 @@ wiremock = "0.6"
 crypto_box = { version = "0.9", features = ["seal"] }
 # The sealed ciphertext and the public key travel base64-encoded, standard
 # alphabet with padding.
-base64 = "0.22"
+base64 = "0.23"
 # The Open Cloud HTTP client with its retry policy, the global flags,
 # `rbxplace.toml` resolution, user lookup and the Studio cookie consent. A
 # branch rather than a rev: Cargo.lock pins the exact commit, and
