@@ -123,6 +123,80 @@ async fn set_writes_to_the_item_path_and_never_puts_the_id_in_the_body() {
     );
 }
 
+/// The body's `ttl` is a protobuf duration: whole seconds with an `s` suffix.
+/// `--ttl 10m` sent as written is refused, so every form the help promises has
+/// to reach the wire as seconds.
+#[tokio::test]
+async fn every_ttl_form_the_help_promises_is_sent_as_seconds() {
+    for (given, sent) in [
+        ("300s", "300s"),
+        ("10m", "600s"),
+        ("2h", "7200s"),
+        ("1d", "86400s"),
+        ("45", "45s"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let server = MockServer::start().await;
+        Mock::given(method("PATCH"))
+            .and(path(ITEM_PATH))
+            .and(body_json(serde_json::json!({ "value": 1, "ttl": sent })))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "id": "rotation", "value": 1 })),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        run(
+            cli(
+                &["set", "rotation", "--value", "1", "--ttl", given, "--apply"],
+                &server,
+            ),
+            &flags(&places_file(dir.path())),
+        )
+        .await
+        .unwrap_or_else(|err| panic!("--ttl {given} should be sent as {sent}: {err:#}"));
+    }
+}
+
+#[tokio::test]
+async fn a_ttl_that_cannot_be_read_is_refused_before_any_request() {
+    for bad in [
+        "10 minutes",
+        "abc",
+        "1.5h",
+        "10x",
+        "0",
+        "0s",
+        "+5m",
+        "s",
+        "",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let server = MockServer::start().await;
+
+        let error = run(
+            cli(
+                &["set", "rotation", "--value", "1", "--ttl", bad, "--apply"],
+                &server,
+            ),
+            &flags(&places_file(dir.path())),
+        )
+        .await
+        .expect_err(&format!("--ttl {bad:?} should be refused"));
+
+        assert!(
+            error.to_string().contains("TTL") || error.to_string().contains("--ttl"),
+            "the error should say the TTL is the problem, got: {error}"
+        );
+        assert!(
+            server.received_requests().await.unwrap().is_empty(),
+            "--ttl {bad:?} must fail before the request"
+        );
+    }
+}
+
 /// A create and an update are the same request. Without `allowMissing`, the
 /// first write to a new item would fail and every `set` would need a read
 /// first.
